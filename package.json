@@ -1,0 +1,7 @@
+{
+  "dependencies": {
+    "@tanstack/react-query": "^5.87.4",
+    "react-hook-form": "^7.62.0",
+    "zod": "^4.1.8"
+  }
+}
