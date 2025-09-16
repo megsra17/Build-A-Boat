@@ -3,6 +3,12 @@ using Npgsql;
 using System.ComponentModel.Design;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
+using System.Security.Claims;
+using System.IdentityModel.Tokens.Jwt;
+using BCrypt.Net;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -22,17 +28,87 @@ builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
 builder.Services.AddScoped<PricingEngine>();
 builder.Services.AddScoped<ConstraintEngine>();
 
+//Auth
+var jwtSection = builder.Configuration.GetSection("Jwt");
+var jwtSecret = jwtSection["Secret"]!;
+var jwtKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret));
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = jwtSection["Issuer"],
+            ValidAudience = jwtSection["Audience"],
+            IssuerSigningKey = jwtKey
+        };
+    });
+
+builder.Services.AddAuthorization(o =>
+{
+    o.AddPolicy("Admin", p => p.RequireClaim(ClaimTypes.Role, "admin"));
+});
+
 var app = builder.Build();
 app.UseCors();
+app.UseAuthentication();
+app.UseAuthorization();
 
-
+// Swagger UI
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
 
-// Endpoints
+var admin = app.MapGroup("/api/admin").RequireAuthorization("Admin");
+
+//Login - issue JWT
+app.MapPost("/api/auth/login", async (LoginRequest req, AppDb db) =>
+{
+    //find user by email
+    var email = req.Email.Trim().ToLowerInvariant();
+
+    //app_user table is in DB map quickly via raw query
+    var user = await db.Set<AppUser>()
+        .FromSqlRaw("SELECT id, email, password_hash, role FROM app_user WHERE email = @email",
+            new NpgsqlParameter("email", email))
+        .AsNoTracking()
+        .SingleOrDefaultAsync();
+
+    if (user is null) return Results.Unauthorized();
+
+    //verify password
+    if (!BCrypt.Net.BCrypt.Verify(req.Password, user.PasswordHash)) return Results.Unauthorized();
+
+    //build JWT
+    var jwtSection = app.Configuration.GetSection("Jwt");
+    var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSection["Secret"]!));
+    var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+    var claims = new[]
+    {
+        new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
+        new Claim(JwtRegisteredClaimNames.Email, user.Email),
+        new Claim(ClaimTypes.Role, user.Role)
+    };
+
+    var token = new JwtSecurityToken(
+        issuer: jwtSection["Issuer"],
+        audience: jwtSection["Audience"],
+        claims: claims,
+        expires: DateTime.UtcNow.AddHours(8),
+        signingCredentials: creds
+    );
+
+    var jwt = new JwtSecurityTokenHandler().WriteToken(token);
+
+    return Results.Ok(new { token, user = new { user.Id, user.Email, user.Role } });
+
+});
 
 //List active boats
 app.MapGet("/api/boats", async (AppDb db) =>
@@ -109,10 +185,10 @@ app.MapPost("/api/builds", async (
 });
 
 //Boats
-app.MapGet("/api/admin/boats", async (AppDb db) =>
+admin.MapGet("/boats", async (AppDb db) =>
     Results.Ok(await db.Boats.OrderBy(x => x.Name).ToListAsync()));
 
-app.MapPost("/api/admin/boats", async (BoatUpsert dto, AppDb db) =>
+admin.MapPost("/boats", async (BoatUpsert dto, AppDb db) =>
 {
     var b = new Boat { Id = Guid.NewGuid(), Slug = dto.Slug, Name = dto.Name, BasePrice = dto.BasePrice, ModelYear = dto.ModelYear, IsActive = true };
     db.Boats.Add(b);
@@ -120,7 +196,7 @@ app.MapPost("/api/admin/boats", async (BoatUpsert dto, AppDb db) =>
     return Results.Created($"/api/admin/boats/{b.Id}", b);
 });
 
-app.MapPatch("/api/admin/boats/{id:guid}", async (Guid id, BoatUpsert dto, AppDb db) =>
+admin.MapPatch("/boats/{id:guid}", async (Guid id, BoatUpsert dto, AppDb db) =>
 {
     var b = await db.Boats.FindAsync(id);
     if (b is null) return Results.NotFound();
@@ -132,7 +208,7 @@ app.MapPatch("/api/admin/boats/{id:guid}", async (Guid id, BoatUpsert dto, AppDb
     return Results.Ok(b);
 });
 
-app.MapDelete("/api/admin/boats/{id:guid}", async (Guid id, AppDb db) =>
+admin.MapDelete("/boats/{id:guid}", async (Guid id, AppDb db) =>
 {
     var b = await db.Boats.FindAsync(id);
     if (b is null) return Results.NotFound();
@@ -142,10 +218,10 @@ app.MapDelete("/api/admin/boats/{id:guid}", async (Guid id, AppDb db) =>
 });
 
 // Categories
-app.MapGet("/api/admin/boats/{boatId:guid}/categories", async (Guid boatId, AppDb db) =>
+admin.MapGet("/boats/{boatId:guid}/categories", async (Guid boatId, AppDb db) =>
     Results.Ok(await db.Categories.Where(c => c.BoatId == boatId).OrderBy(c => c.SortOrder).ToListAsync()));
 
-app.MapPost("/api/admin/categories", async (CategoryUpsert dto, AppDb db) =>
+admin.MapPost("/categories", async (CategoryUpsert dto, AppDb db) =>
 {
     var c = new Category { Id = Guid.NewGuid(), BoatId = dto.BoatId, Name = dto.Name, SortOrder = dto.SortOrder, IsRequired = dto.IsRequired };
     db.Categories.Add(c);
@@ -153,7 +229,7 @@ app.MapPost("/api/admin/categories", async (CategoryUpsert dto, AppDb db) =>
     return Results.Created($"/api/admin/categories/{c.Id}", c);
 });
 
-app.MapPatch("/api/admin/categories/{id:guid}", async (Guid id, CategoryUpsert dto, AppDb db) =>
+admin.MapPatch("/categories/{id:guid}", async (Guid id, CategoryUpsert dto, AppDb db) =>
 {
     var c = await db.Categories.FindAsync(id);
     if (c is null) return Results.NotFound();
@@ -165,7 +241,7 @@ app.MapPatch("/api/admin/categories/{id:guid}", async (Guid id, CategoryUpsert d
     return Results.Ok(c);
 });
 
-app.MapDelete("/api/admin/categories/{id:guid}", async (Guid id, AppDb db) =>
+admin.MapDelete("/categories/{id:guid}", async (Guid id, AppDb db) =>
 {
     var c = await db.Categories.FindAsync(id);
     if (c is null) return Results.NotFound();
@@ -175,10 +251,10 @@ app.MapDelete("/api/admin/categories/{id:guid}", async (Guid id, AppDb db) =>
 });
 
 // Option groups
-app.MapGet("/api/admin/categories/{categoryId:guid}/option-groups", async (Guid categoryId, AppDb db) =>
+admin.MapGet("/categories/{categoryId:guid}/option-groups", async (Guid categoryId, AppDb db) =>
     Results.Ok(await db.OptionGroups.Where(g => g.CategoryId == categoryId).OrderBy(g => g.SortOrder).ToListAsync()));
 
-app.MapPost("/api/admin/option-groups", async (OptionGroupUpsert dto, AppDb db) =>
+admin.MapPost("/option-groups", async (OptionGroupUpsert dto, AppDb db) =>
 {
     var g = new OptionGroup
     {
@@ -195,7 +271,7 @@ app.MapPost("/api/admin/option-groups", async (OptionGroupUpsert dto, AppDb db) 
     return Results.Created($"/api/admin/option-groups/{g.Id}", g);
 });
 
-app.MapPatch("/api/admin/option-groups/{id:guid}", async (Guid id, OptionGroupUpsert dto, AppDb db) =>
+admin.MapPatch("/option-groups/{id:guid}", async (Guid id, OptionGroupUpsert dto, AppDb db) =>
 {
     var g = await db.OptionGroups.FindAsync(id);
     if (g is null) return Results.NotFound();
@@ -209,7 +285,7 @@ app.MapPatch("/api/admin/option-groups/{id:guid}", async (Guid id, OptionGroupUp
     return Results.Ok(g);
 });
 
-app.MapDelete("/api/admin/option-groups/{id:guid}", async (Guid id, AppDb db) =>
+admin.MapDelete("/option-groups/{id:guid}", async (Guid id, AppDb db) =>
 {
     var g = await db.OptionGroups.FindAsync(id);
     if (g is null) return Results.NotFound();
@@ -219,15 +295,15 @@ app.MapDelete("/api/admin/option-groups/{id:guid}", async (Guid id, AppDb db) =>
 });
 
 // Options
-app.MapGet("/api/admin/option-groups/{groupId:guid}/options", async (Guid groupId, AppDb db) =>
-    Results.Ok(await db.Options.Where(o => o.OptionsGroupId == groupId).ToListAsync()));
+admin.MapGet("/option-groups/{groupId:guid}/options", async (Guid groupId, AppDb db) =>
+    Results.Ok(await db.Options.Where(o => o.OptionGroupId == groupId).ToListAsync()));
 
-app.MapPost("/api/admin/options", async (OptionUpsert dto, AppDb db) =>
+admin.MapPost("/options", async (OptionUpsert dto, AppDb db) =>
 {
     var o = new Option
     {
         id = Guid.NewGuid(),
-        OptionsGroupId = dto.OptionGroupId,
+        OptionGroupId = dto.OptionGroupId,
         Sku = dto.Sku,
         Label = dto.Label,
         Description = dto.Description,
@@ -241,11 +317,11 @@ app.MapPost("/api/admin/options", async (OptionUpsert dto, AppDb db) =>
     return Results.Created($"/api/admin/options/{o.id}", o);
 });
 
-app.MapPatch("/api/admin/options/{id:guid}", async (Guid id, OptionUpsert dto, AppDb db) =>
+admin.MapPatch("/options/{id:guid}", async (Guid id, OptionUpsert dto, AppDb db) =>
 {
     var o = await db.Options.FindAsync(id);
     if (o is null) return Results.NotFound();
-    o.OptionsGroupId = dto.OptionGroupId;
+    o.OptionGroupId = dto.OptionGroupId;
     o.Sku = dto.Sku;
     o.Label = dto.Label;
     o.Description = dto.Description;
@@ -257,7 +333,7 @@ app.MapPatch("/api/admin/options/{id:guid}", async (Guid id, OptionUpsert dto, A
     return Results.Ok(o);
 });
 
-app.MapDelete("/api/admin/options/{id:guid}", async (Guid id, AppDb db) =>
+admin.MapDelete("/options/{id:guid}", async (Guid id, AppDb db) =>
 {
     var o = await db.Options.FindAsync(id);
     if (o is null) return Results.NotFound();
@@ -267,199 +343,3 @@ app.MapDelete("/api/admin/options/{id:guid}", async (Guid id, AppDb db) =>
 });
 
 app.Run();
-
-public record BoatUpsert(string Slug, string Name, decimal BasePrice, int? ModelYear);
-public record CategoryUpsert(Guid BoatId, string Name, int SortOrder, bool IsRequired);
-public record OptionGroupUpsert(Guid CategoryId, string Name, string SelectionType, int MinSelect, int MaxSelect, int SortOrder);
-public record OptionUpsert(Guid OptionGroupId, string? Sku, string Label, string? Description, decimal PriceDelta, string? ImageUrl, bool IsDefault, bool IsActive, int SortOrder);
-
-// Data + EF + Helpers
-
-public class AppDb : DbContext
-{
-    public AppDb(DbContextOptions<AppDb> o) : base(o) { }
-
-    public DbSet<Boat> Boats => Set<Boat>();
-    public DbSet<Category> Categories => Set<Category>();
-    public DbSet<OptionGroup> OptionGroups => Set<OptionGroup>();
-    public DbSet<Option> Options => Set<Option>();
-    public DbSet<ConstraintRule> ConstraintRules => Set<ConstraintRule>();
-    public DbSet<PricingRule> PricingRules => Set<PricingRule>();
-    public DbSet<Build> Builds => Set<Build>();
-
-    //keyless entity for boat config view
-    public DbSet<BoatConfigRow> BoatConfigs => Set<BoatConfigRow>();
-
-    protected override void OnModelCreating(ModelBuilder b)
-    {
-        b.Entity<Boat>().HasIndex(x => x.Slug).IsUnique();
-        b.Entity<Category>().HasOne(x => x.Boat).WithMany(x => x.Categories).HasForeignKey(x => x.BoatId);
-        b.Entity<OptionGroup>().HasOne(x => x.Category).WithMany(x => x.OptionsGroups).HasForeignKey(x => x.CategoryId);
-        b.Entity<Option>().HasOne(x => x.OptionsGroup).WithMany(x => x.Options).HasForeignKey(x => x.OptionsGroupId);
-
-        //Map keyless entity to view
-        b.Entity<BoatConfigRow>().HasNoKey().ToView(null);
-    }
-}
-
-public class Boat
-{
-    public Guid Id { get; set; }
-    public string Slug { get; set; } = "";
-    public string Name { get; set; } = "";
-    public decimal BasePrice { get; set; }
-    public bool IsActive { get; set; } = true;
-    public int? ModelYear { get; set; }
-    public string? HeroImageUrl { get; set; }
-    public ICollection<Category> Categories { get; set; } = new List<Category>();
-}
-
-public class Category
-{
-    public Guid Id { get; set; }
-    public Guid BoatId { get; set; }
-    public Boat Boat { get; set; } = default!;
-    public string Name { get; set; } = "";
-    public int SortOrder { get; set; }
-    public bool IsRequired { get; set; }
-    public ICollection<OptionGroup> OptionsGroups { get; set; } = new List<OptionGroup>();
-}
-
-public class OptionGroup
-{
-    public Guid Id { get; set; }
-    public Guid CategoryId { get; set; }
-    public Category Category { get; set; } = default!;
-    public string Name { get; set; } = "";
-    public string SelectionType { get; set; } = "single"; //single, multi
-    public int MinSelect { get; set; }
-    public int MaxSelect { get; set; }
-    public int SortOrder { get; set; }
-    public ICollection<Option> Options { get; set; } = new List<Option>();
-}
-
-public class Option
-{
-    public Guid id { get; set; }
-    public Guid OptionsGroupId { get; set; }
-    public OptionGroup OptionsGroup { get; set; } = default!;
-    public string? Sku { get; set; }
-    public string Label { get; set; } = "";
-    public string? Description { get; set; }
-    public decimal Price { get; set; }
-    public string? ImageUrl { get; set; }
-    public bool IsDefault { get; set; }
-    public bool IsActive { get; set; } = true;
-    public JsonNode? Metadata { get; set; }
-}
-
-public class ConstraintRule
-{
-    public Guid Id { get; set; }
-    public Guid BoatId { get; set; }
-    public string Type { get; set; } = ""; //requires, excludes
-    public JsonNode Expression { get; set; } = default!;
-    public DateTime CreatedAt { get; set; }
-}
-
-public class PricingRule
-{
-    public Guid Id { get; set; }
-    public Guid BoatId { get; set; }
-    public string RuleType { get; set; } = ""; //fixed, percent, tiered 
-    public JsonNode Expression { get; set; } = default!;
-    public decimal Amount { get; set; }
-    public int ApplyOrder { get; set; }
-    public DateTime CreatedAt { get; set; }
-}
-
-public class Build
-{
-    public Guid Id { get; set; }
-    public Guid BoatId { get; set; }
-    public JsonNode Selections { get; set; } = default!;
-    public decimal Subtotal { get; set; }
-    public decimal Total { get; set; }
-    public Guid? CreatedBy { get; set; }
-    public DateTime CreatedAt { get; set; }
-}
-
-public class BoatConfigRow
-{
-    public Guid BoatId { get; set; }
-    public string Slug { get; set; } = "";
-    public string Name { get; set; } = "";
-    public decimal BasePrice { get; set; }
-    public JsonNode? categories { get; set; }
-    public JsonNode? constraints { get; set; }
-    public JsonNode? pricingRules { get; set; }
-
-    public object AsJson() => new
-    {
-        BoatId,
-        Slug,
-        Name,
-        BasePrice,
-        Categories = categories ?? new JsonArray(),
-        Constraints = constraints ?? new JsonArray(),
-        PricingRules = pricingRules ?? new JsonArray()
-    };
-}
-
-//Request DTO
-public record PriceRequest(string BoatSlug, Guid[]? SelectedOptions);
-
-//Pricing engine: base + options + pricing rules
-public class PricingEngine
-{
-    public PriceResult Calculate(
-        Boat boat,
-        IDictionary<Guid, Option> allOptions,
-        HashSet<Guid> selected,
-        IEnumerable<PricingRule> rules)
-    {
-        var subtotal = boat.BasePrice + selected.Where(allOptions.ContainsKey).Select(id => allOptions[id].Price).DefaultIfEmpty(0m).Sum();
-
-        foreach (var r in rules.Where(r => r.RuleType == "bunldeDiscount"))
-        {
-            var allOf = r.Expression?["allOf"]?.AsArray()?.Select(n => Guid.Parse(n!.GetValue<string>())).ToHashSet() ?? new HashSet<Guid>();
-            if (allOf.Count > 0 && allOf.All(selected.Contains))
-            {
-                subtotal += r.Amount; //Amount is negative for discount
-            }
-        }
-
-        return new PriceResult { Subtotal = subtotal, Total = subtotal };
-    }
-}
-
-public class PriceResult
-{
-    public decimal Subtotal { get; set; }
-    public decimal Total { get; set; }
-}
-
-//Constraint engine: requires, excludes
-public class ConstraintEngine
-{
-    public List<string> CheckRequires(IEnumerable<ConstraintRule> rules, HashSet<Guid> selected)
-    {
-        var errors = new List<string>();
-        foreach (var r in rules.Where(r => r.Type == "requires"))
-        {
-            var ifAny = r.Expression?["ifAny"]?.AsArray()?.Select(n => Guid.Parse(n!.GetValue<string>())).ToHashSet()
-                ?? new HashSet<Guid>();
-            var thenAny = r.Expression?["thenAny"]?.AsArray()?.Select(n => Guid.Parse(n!.GetValue<string>())).ToHashSet() ?? new HashSet<Guid>();
-            if (ifAny.Count == 0 || thenAny.Count == 0) continue;
-
-            var trigger = ifAny.Any(selected.Contains);
-            var satisfied = thenAny.Any(selected.Contains);
-
-            if (trigger && !satisfied)
-            {
-                errors.Add($"Requires one of: {string.Join(", ", thenAny)}");
-            }
-        }
-        return errors;
-    }
-}

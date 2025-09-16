@@ -48,3 +48,12 @@
 /Users/Megan/Desktop/Build A Boat/Api/bin/Debug/net9.0/Swashbuckle.AspNetCore.SwaggerGen.dll
 /Users/Megan/Desktop/Build A Boat/Api/bin/Debug/net9.0/Swashbuckle.AspNetCore.SwaggerUI.dll
 /Users/Megan/Desktop/Build A Boat/Api/obj/Debug/net9.0/Api.sourcelink.json
+/Users/Megan/Desktop/Build A Boat/Api/bin/Debug/net9.0/BCrypt.Net-Next.dll
+/Users/Megan/Desktop/Build A Boat/Api/bin/Debug/net9.0/Microsoft.AspNetCore.Authentication.JwtBearer.dll
+/Users/Megan/Desktop/Build A Boat/Api/bin/Debug/net9.0/Microsoft.IdentityModel.Abstractions.dll
+/Users/Megan/Desktop/Build A Boat/Api/bin/Debug/net9.0/Microsoft.IdentityModel.JsonWebTokens.dll
+/Users/Megan/Desktop/Build A Boat/Api/bin/Debug/net9.0/Microsoft.IdentityModel.Logging.dll
+/Users/Megan/Desktop/Build A Boat/Api/bin/Debug/net9.0/Microsoft.IdentityModel.Protocols.dll
+/Users/Megan/Desktop/Build A Boat/Api/bin/Debug/net9.0/Microsoft.IdentityModel.Protocols.OpenIdConnect.dll
+/Users/Megan/Desktop/Build A Boat/Api/bin/Debug/net9.0/Microsoft.IdentityModel.Tokens.dll
+/Users/Megan/Desktop/Build A Boat/Api/bin/Debug/net9.0/System.IdentityModel.Tokens.Jwt.dll

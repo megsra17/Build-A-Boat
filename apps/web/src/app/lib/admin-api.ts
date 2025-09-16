@@ -7,14 +7,20 @@ export type OptionItem = { id: string; optionGroupId: string; sku?: string|null;
 
 async function j<T>(r: Response){ if(!r.ok) throw new Error(await r.text()); return r.json() as Promise<T>; }
 
+function authHeaders(): Record<string, string> {
+  const t = typeof window !== "undefined" ? localStorage.getItem("admin_token") : null;
+  return t ? {Authorization: `Bearer ${t}`} : {};
+}
+
 export const AdminApi = {
-  listBoats: () => fetch(`${API}/api/admin/boats`, { cache: "no-store" }).then(j<Boat[]>),
-  upsertBoat: (id: string | undefined, body: Omit<Boat, "id" | "isActive"> & { isActive?: boolean }) =>
+  listBoats: () =>
+    fetch(`${API}/api/admin/boats`, { cache: "no-store", headers: { ...authHeaders() } }).then(j),
+  upsertBoat: (id: string | undefined, body: Omit<Boat, 'id'>) =>
     fetch(`${API}/api/admin/boats${id ? "/" + id : ""}`, {
       method: id ? "PATCH" : "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...authHeaders() },
       body: JSON.stringify(body),
-    }).then(j<Boat>),
+    }).then(j),
   listCategories: (boatId: string) => fetch(`${API}/api/admin/boats/${boatId}/categories`, { cache: "no-store" }).then(j<Category[]>),
   upsertCategory: (id: string|undefined, body: Omit<Category,"id">) =>
     fetch(`${API}/api/admin/categories${id?"/"+id:""}`, { method: id?"PATCH":"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) }).then(j<Category>),
@@ -24,5 +30,8 @@ export const AdminApi = {
   listOptions: (groupId: string) => fetch(`${API}/api/admin/groups/${groupId}/options`, { cache: "no-store" }).then(j<OptionItem[]>),
   upsertOption: (id: string|undefined, body: Omit<OptionItem,"id">) =>
     fetch(`${API}/api/admin/options${id?"/"+id:""}`, { method: id?"PATCH":"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) }).then(j<OptionItem>),
-  delete: (path: string) => fetch(`${API}${path}`, { method: "DELETE" }).then(r => { if(!r.ok) throw new Error("Delete failed"); })
+  delete: (path: string) =>
+    fetch(`${API}${path}`, { method: "DELETE", headers: { ...authHeaders() } }).then((r) => {
+      if (!r.ok) throw new Error("Delete failed");
+    })
 };
