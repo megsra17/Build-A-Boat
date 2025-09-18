@@ -32,10 +32,8 @@ export default function AdminForgotPasswordPage() {
       className="relative min-h-screen w-full bg-cover bg-center"
       style={{ backgroundImage: "url('/login-bg.jpeg')" }}
     >
-      {/* dark overlay */}
       <div className="absolute inset-0 bg-black/60" />
 
-      {/* login panel */}
       <main className="relative z-10 flex min-h-screen items-center justify-end px-6">
         <form onSubmit={submit} className="w-full max-w-md bg-white/10 p-6 rounded-xl text-white">
              <h1 className="text-xl font-semibold mb-4">Forgot Password</h1>
@@ -48,6 +46,7 @@ export default function AdminForgotPasswordPage() {
              onChange={(e) => setEmail(e.target.value)}
             required/>
          <button className="w-full bg-amber-500 hover:bg-amber-500 text-black rounded py-2" type="submit">Submit</button>
+         <button className="w-full mt-2 bg-gray-700 hover:bg-gray-600 text-white rounded py-2" type="button" onClick={() => window.location.href = "/admin/login"}>Back to Login</button>
          </form>
       </main>
     </div>
