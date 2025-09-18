@@ -12,6 +12,7 @@ public class AppUser
     public string Role { get; set; } = "user"; //user, admin
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
+    public bool IsActive { get; set; } = true;
 }
 
 public class AppDb : DbContext

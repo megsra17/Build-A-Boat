@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Cog, Gauge, Users, Ship, Shield } from "lucide-react";
+import UserMenu from "../components/UserMenu";
 
 const nav = [
   { href: "/admin", label: "Dashboard", icon: Gauge },
@@ -44,10 +45,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <img src="/logo.svg" onError={(e)=>((e.target as HTMLImageElement).style.display="none")} alt="" className="h-6" />
           <span className="text-xl font-semibold">Login</span>
         </div>
-        <div className="flex items-center gap-2 bg-[#141414] rounded-full px-2 py-1 border border-white/10">
-          <div className="size-6 rounded-full bg-orange-500 text-xs flex items-center justify-center">{initials}</div>
-          <span className="text-sm pr-2">{user?.email ?? "Guest"}</span>
-        </div>
+        <UserMenu user={user} />
       </header>
 
       {/* Body */}

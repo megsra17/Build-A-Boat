@@ -234,6 +234,14 @@ app.MapPost("/api/builds", async (
     });
 });
 
+//Users
+admin.MapGet("/users/count", async (AppDb db) =>
+{
+    var count = await db.Set<AppUser>().CountAsync(u => u.IsActive);
+    return Results.Ok(new { count });
+});
+
+
 //Boats
 admin.MapGet("/boats", async (AppDb db) =>
     Results.Ok(await db.Boats.OrderBy(x => x.Name).ToListAsync()));
