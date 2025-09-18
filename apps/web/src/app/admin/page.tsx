@@ -12,7 +12,7 @@ export default function AdminHome() {
   async function load() {
     try{
       const token = localStorage.getItem("token");
-      const res = await fetch(`${API}/api/admin/users/count`, {
+      const res = await fetch(`${API}//users/count`, {
         headers: {
           Authorization: `Bearer ${token}`
         }
