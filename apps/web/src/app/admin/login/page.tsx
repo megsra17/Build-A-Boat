@@ -10,7 +10,7 @@ const DEV_BYPASS = process.env.NEXT_PUBLIC_DEV_AUTH_BYPASS === "1";
 export default function AdminLoginPage() {
   const r = useRouter();
   const sp = useSearchParams();
-  const next = sp.get("next") || "/admin/boats";
+  const next = sp.get("next") || "/admin";
 
   const [email, setEmail] = useState("admin@example.com");
   const [password, setPassword] = useState("");
@@ -23,6 +23,7 @@ export default function AdminLoginPage() {
     e.preventDefault();
     setErr(null);
     setBusy(true);
+    
     try {
       const res = await fetch(`${API}/api/auth/login`, {
         method: "POST",
@@ -35,6 +36,8 @@ export default function AdminLoginPage() {
       if (remember) localStorage.setItem("admin_jwt", data.token);
       else sessionStorage.setItem("admin_jwt", data.token);
       localStorage.setItem("admin_user", JSON.stringify(data.user));
+      localStorage.setItem("toekn", data.token);
+      localStorage.setItem("user", JSON.stringify(data.user));
       document.cookie = `admin=ok; Path=/; Max-Age=${60 * 60 * 8}`;
 
       r.replace(next);
