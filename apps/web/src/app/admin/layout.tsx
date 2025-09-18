@@ -42,8 +42,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       {/* Top bar */}
       <header className="h-12 bg-[#1e1e1e] border-b border-white/10 flex items-center justify-between px-3">
         <div className="flex items-center gap-3">
-          <img src="/logo.svg" onError={(e)=>((e.target as HTMLImageElement).style.display="none")} alt="" className="h-6" />
-          <span className="text-xl font-semibold">Login</span>
+          <img src="/logo-light.svg" onError={(e)=>((e.target as HTMLImageElement).style.display="none")} alt="" className="h-6" />
         </div>
         <UserMenu user={user} />
       </header>
