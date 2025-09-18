@@ -9,6 +9,7 @@ using System.Text;
 using System.Security.Claims;
 using System.IdentityModel.Tokens.Jwt;
 using BCrypt.Net;
+using Microsoft.AspNetCore.Identity.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -108,6 +109,55 @@ app.MapPost("/api/auth/login", async (LoginRequest req, AppDb db) =>
 
     return Results.Ok(new { token, user = new { user.Id, user.Email, user.Role } });
 
+});
+
+//Forgot password
+app.MapPost("api/auth/forgot-password", async (ForgotPasswordRequest req, AppDb db) =>
+{
+    var email = req.Email.Trim().ToLowerInvariant();
+    var user = await db.Set<AppUser>()
+    .FromSqlRaw("SELECT id, email, password_hash, role FROM app_user WHERE email = @email",
+        new NpgsqlParameter("email", email))
+        .AsNoTracking()
+        .SingleOrDefaultAsync();
+
+    if (user is null) return Results.Ok(new { message = "If that email is registered, a reset link has been sent." });
+    var token = Guid.NewGuid().ToString("N");
+    var expiry = DateTime.UtcNow.AddHours(1);
+
+    //save reset token
+    await db.Database.ExecuteSqlRawAsync(
+        "INSERT INTO password_resets (user_id, token, expires_at) VALUES (@userId, @token, @expiresAt)",
+        new NpgsqlParameter("userId", user.Id),
+        new NpgsqlParameter("token", token),
+        new NpgsqlParameter("expiresAt", expiry)
+    );
+
+    //TODO: send email with link (for now just return the token)
+    return Results.Ok(new { message = "If that email is registered, a reset link has been sent." });
+});
+
+//Reset password
+app.MapPost("api/auth/reset-password", async (ResetPasswordRequest req, AppDb db) =>
+{
+    var reset = await db.Database.SqlQueryRaw<(Guid UserId, DateTime ExpiresAt)>(
+         "SELECT user_id, expires_at FROM password_resets WHERE token = @token",
+        new NpgsqlParameter("token", req.Token)).FirstOrDefaultAsync();
+
+    if (reset == default || reset.ExpiresAt < DateTime.UtcNow)
+        return Results.BadRequest(new { message = "Invalid or expired token" });
+
+    var hash = BCrypt.Net.BCrypt.HashPassword(req.NewPassword);
+    await db.Database.ExecuteSqlRawAsync(
+        "UPDATE app_user SET password_hash = @hash WHERE id = @userId",
+        new NpgsqlParameter("hash", hash),
+        new NpgsqlParameter("userId", reset.UserId)
+    );
+    await db.Database.ExecuteSqlRawAsync(
+        "DELETE FROM password_resets WHERE user_id = @userId",
+        new NpgsqlParameter("userId", reset.UserId)
+    );
+    return Results.Ok(new { message = "Password has been reset" });
 });
 
 //List active boats
