@@ -1,5 +1,7 @@
 const API = process.env.NEXT_PUBLIC_API_BASE;
 
+import { authFetch } from "../lib/auth-client";
+
 export type Boat = { id: string; slug: string; name: string; basePrice: number; modelYear?: number | null; isActive: boolean; };
 export type Category = { id: string; boatId: string; name: string; sortOrder: number; isRequired: boolean; };
 export type OptionGroup = { id: string; categoryId: string; name: string; selectionType: string; minSelect: number; maxSelect: number; sortOrder: number; };
@@ -10,6 +12,32 @@ async function j<T>(r: Response){ if(!r.ok) throw new Error(await r.text()); ret
 function authHeaders(): Record<string, string> {
   const t = typeof window !== "undefined" ? localStorage.getItem("admin_token") : null;
   return t ? {Authorization: `Bearer ${t}`} : {};
+}
+
+export type UserRow = {
+  id: string;
+  email: string;
+  role: string;
+  username?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export const UsersApi = {
+  list: (opts?: {search?: string; page?: number; pageSize?: number}) =>{
+    const p = new URLSearchParams();
+    if(opts?.search) p.set("search", opts.search);
+    if(opts?.page) p.set("page", opts.page.toString());
+    if(opts?.pageSize) p.set("pageSize", opts.pageSize.toString());
+    const qs = p.toString() ? `?${p.toString()}` : "";
+    return fetch(`${API}/api/admin/users${qs}`, { cache: "no-store", headers: { ...authHeaders() } }).then(j);
+  },
+  create: (body: { email: string; username?: string; role: string; password?: string }) =>
+    authFetch(`${API}/api/admin/users`, { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body) }).then(j<{id:string}>),
+  update: (id: string, body: Partial<{ email: string; username: string; role: string; password: string }>) =>
+    authFetch(`${API}/api/admin/users/${id}`, { method:"PATCH", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body) }).then(j<{id:string}>),
+  delete: (id: string) =>
+    authFetch(`${API}/api/admin/users/${id}`, { method:"DELETE" }).then(async r => { if(!r.ok) throw new Error(await r.text()); }),
 }
 
 export const AdminApi = {

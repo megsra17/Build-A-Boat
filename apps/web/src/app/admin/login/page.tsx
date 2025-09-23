@@ -33,10 +33,10 @@ export default function AdminLoginPage() {
       if (!res.ok) throw new Error("Invalid email or password.");
       const data = await res.json();
 
-      if (remember) localStorage.setItem("admin_jwt", data.token);
-      else sessionStorage.setItem("admin_jwt", data.token);
+      if (remember) localStorage.setItem("jwt", data.token);
+      else sessionStorage.setItem("jwt", data.token);
       localStorage.setItem("admin_user", JSON.stringify(data.user));
-      localStorage.setItem("toekn", data.token);
+      localStorage.setItem("token", data.token);
       localStorage.setItem("user", JSON.stringify(data.user));
       document.cookie = `admin=ok; Path=/; Max-Age=${60 * 60 * 8}`;
 

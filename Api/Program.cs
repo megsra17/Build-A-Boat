@@ -241,10 +241,88 @@ admin.MapGet("/users/count", async (AppDb db) =>
     return Results.Ok(new { count });
 });
 
+admin.MapGet("/users", async (HttpRequest http, AppDb db) =>
+{
+    //query params
+    var q = http.Query;
+    var search = q["search"].ToString()?.Trim();
+    int page = int.TryParse(q["page"], out var p) ? Math.Max(1, p) : p;
+    int pageSize = int.TryParse(q["pageSize"], out var s) ? Math.Clamp(s, 1, 100) : 25;
+
+    var qry = db.Set<AppUser>().AsNoTracking();
+
+    if (!string.IsNullOrEmpty(search))
+    {
+        var sterm = search.ToLower();
+        qry = qry.Where(u => u.Email.ToLower().Contains(sterm) || (u.Username != null && u.Username.ToLower().Contains(sterm)));
+    }
+
+    var total = await qry.CountAsync();
+
+    var items = await qry
+        .OrderBy(u => u.Email)
+        .Skip((page - 1) * pageSize)
+        .Take(pageSize)
+        .Select(u => new UserListItem(u.Id, u.Email, u.Username, u.Role, u.CreatedAt, u.UpdatedAt))
+        .ToListAsync();
+
+    return Results.Ok(new { total, page, pageSize, items });
+});
+
+admin.MapPost("/users", async (UpsertUser dto, AppDb db) =>
+{
+    var exists = await db.Set<AppUser>().AnyAsync(u => u.Email == dto.Email);
+    if (exists) return Results.Conflict(new { message = "Email already in use" });
+
+    var u = new AppUser
+    {
+        Id = Guid.NewGuid(),
+        Email = dto.Email,
+        Username = dto.Username,
+        Role = string.IsNullOrEmpty(dto.Role) ? "user" : dto.Role,
+        PasswordHash = string.IsNullOrEmpty(dto.Password) ? "" : BCrypt.Net.BCrypt.HashPassword(dto.Password),
+        CreatedAt = DateTime.UtcNow,
+        UpdatedAt = DateTime.UtcNow,
+    };
+    db.Add(u);
+    await db.SaveChangesAsync();
+    return Results.Created($"/api/admin/users/{u.Id}", new { u.Id });
+});
+
+admin.MapPatch("users/{id:guid}", async (Guid id, UpsertUser dto, AppDb db) =>
+{
+    var u = await db.Set<AppUser>().FindAsync(id);
+    if (u is null) return Results.NotFound();
+
+    if (!string.IsNullOrWhiteSpace(dto.Email) && dto.Email != u.Email)
+    {
+        var exists = await db.Set<AppUser>().AnyAsync(x => x.Email == dto.Email && x.Id != id);
+        if (exists) return Results.Conflict(new { message = "Email already in use" });
+        u.Email = dto.Email.Trim().ToLowerInvariant();
+    }
+
+    u.Username = dto.Username?.Trim() ?? u.Username;
+    u.Role = string.IsNullOrWhiteSpace(dto.Role) ? u.Role : dto.Role;
+    if (!string.IsNullOrWhiteSpace(dto.Password))
+        u.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password);
+    u.UpdatedAt = DateTime.UtcNow;
+    await db.SaveChangesAsync();
+    return Results.Ok(new { u.Id });
+});
+
+admin.MapDelete("/users/{id:guid}", async (Guid id, AppDb db) =>
+{
+    var u = await db.Set<AppUser>().FindAsync(id);
+    if (u is null) return Results.NotFound();
+    db.Remove(u);
+    await db.SaveChangesAsync();
+    return Results.NoContent();
+});
+
 
 //Boats
 admin.MapGet("/boats", async (AppDb db) =>
-    Results.Ok(await db.Boats.OrderBy(x => x.Name).ToListAsync()));
+            Results.Ok(await db.Boats.OrderBy(x => x.Name).ToListAsync()));
 
 admin.MapPost("/boats", async (BoatUpsert dto, AppDb db) =>
 {
