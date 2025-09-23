@@ -11,6 +11,10 @@ public class AppUser
     public string PasswordHash { get; set; } = "";
     public string? Username { get; set; }
     public string Role { get; set; } = "user"; //user, admin
+    public string? FirstName { get; set; }
+    public string? LastName { get; set; }
+    public string? Timezone { get; set; }
+    public string? AvatarUrl { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
     public bool IsActive { get; set; } = true;
@@ -36,6 +40,12 @@ public class AppDb : DbContext
 
         // Map to exact table names
         b.Entity<AppUser>().ToTable("app_user");
+        b.Entity<AppUser>().Property(x => x.FirstName).HasColumnName("first_name"); b.Entity<AppUser>().Property(x => x.Username).HasColumnName("username");
+        b.Entity<AppUser>().Property(x => x.FirstName).HasColumnName("first_name");
+        b.Entity<AppUser>().Property(x => x.LastName).HasColumnName("last_name");
+        b.Entity<AppUser>().Property(x => x.Timezone).HasColumnName("timezone");
+        b.Entity<AppUser>().Property(x => x.AvatarUrl).HasColumnName("avatar_url");
+
         b.Entity<Boat>().ToTable("boat");
         b.Entity<Category>().ToTable("category");
         b.Entity<OptionGroup>().ToTable("option_group");

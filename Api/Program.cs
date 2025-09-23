@@ -281,6 +281,10 @@ admin.MapPost("/users", async (UpsertUser dto, AppDb db) =>
         Username = dto.Username,
         Role = string.IsNullOrEmpty(dto.Role) ? "user" : dto.Role,
         PasswordHash = string.IsNullOrEmpty(dto.Password) ? "" : BCrypt.Net.BCrypt.HashPassword(dto.Password),
+        FirstName = dto.FirstName?.Trim(),
+        LastName = dto.LastName?.Trim(),
+        Timezone = dto.Timezone?.Trim(),
+        AvatarUrl = dto.AvatarUrl?.Trim(),
         CreatedAt = DateTime.UtcNow,
         UpdatedAt = DateTime.UtcNow,
     };
@@ -305,6 +309,12 @@ admin.MapPatch("users/{id:guid}", async (Guid id, UpsertUser dto, AppDb db) =>
     u.Role = string.IsNullOrWhiteSpace(dto.Role) ? u.Role : dto.Role;
     if (!string.IsNullOrWhiteSpace(dto.Password))
         u.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password);
+
+    u.FirstName = dto.FirstName?.Trim() ?? u.FirstName;
+    u.LastName = dto.LastName?.Trim() ?? u.LastName;
+    u.Timezone = dto.Timezone?.Trim() ?? u.Timezone;
+    u.AvatarUrl = dto.AvatarUrl?.Trim() ?? u.AvatarUrl;
+
     u.UpdatedAt = DateTime.UtcNow;
     await db.SaveChangesAsync();
     return Results.Ok(new { u.Id });

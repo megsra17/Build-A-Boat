@@ -32,9 +32,18 @@ export const UsersApi = {
     const qs = p.toString() ? `?${p.toString()}` : "";
     return fetch(`${API}/api/admin/users${qs}`, { cache: "no-store", headers: { ...authHeaders() } }).then(j);
   },
-  create: (body: { email: string; username?: string; role: string; password?: string }) =>
+  create: (body: {
+    email: string;
+    username?: string;
+    role: string;
+    password?: string;
+    firstName?: string;
+    lastName?: string;
+    timezone?: string;
+    avatarUrl?: string;
+  }) =>
     authFetch(`${API}/api/admin/users`, { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body) }).then(j<{id:string}>),
-  update: (id: string, body: Partial<{ email: string; username: string; role: string; password: string }>) =>
+  update: (id: string, body: Partial<{ email: string; username: string; role: string; password: string; firstName: string; lastName: string; timezone: string; avatarUrl: string; }>) =>
     authFetch(`${API}/api/admin/users/${id}`, { method:"PATCH", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body) }).then(j<{id:string}>),
   delete: (id: string) =>
     authFetch(`${API}/api/admin/users/${id}`, { method:"DELETE" }).then(async r => { if(!r.ok) throw new Error(await r.text()); }),
