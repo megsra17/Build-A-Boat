@@ -1,169 +1,199 @@
 "use client";
 
-import { useState } from "react";
-import { QueryClient, QueryClientProvider, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AdminApi, Boat } from "@/app/lib/admin-api";
-import { useForm } from "react-hook-form";
+import { useState, useEffect } from "react";
+import Image from "next/image";
+import { BoatsApi, type Boat } from "@/app/lib/admin-api";
+import {Search, Plus, RefreshCw, Copy, Trash2 } from "lucide-react";
 import Link from "next/link";
+import { de } from "zod/locales";
 
-const queryClient = new QueryClient();
+export default function BoatsPage() {
+  const [rows, setRows] = useState<Boat[]>([]);
+  const [search, setSearch] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [showDupFor, setShowDupFor] = useState<Boat |null>(null);
+  const [dupSlug, setDupSlug] = useState("");
+  const [dupName, setDupName] = useState("");
+  const [dupYear, setDupYear] = useState<number | undefined>(undefined);
 
-export default function Page() {
+
+  async function load() {
+    setBusy(true);
+    setError("");
+    try{
+      const res = await BoatsApi.list(search || undefined);
+      setRows(res.items);
+    } catch (error) {
+      setError("Failed to load boats");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      load();
+    }, 500);
+    return () => clearTimeout(t);
+  },[search]);
+
+  async function toggleActive(id: string) {
+    try { await BoatsApi.toggleActive(id); load(); }
+    catch(e:any){ alert(e.message || e); }
+  }
+
+  async function deleteBoat(id: string) {
+    if(!confirm("Are you sure you want to delete this boat? This action cannot be undone.")) return;
+    try { await BoatsApi.remove(id); load(); }
+    catch(e:any){ alert(e.message || e); }
+  }
+
+  function openDup(b: Boat) {
+    setShowDupFor(b);
+    setDupSlug(`${b.slug}-copy`);
+    setDupName(`${b.name} Copy`);
+    setDupYear(b.modelYear ?? undefined);
+  }
+
+  async function doDuplicate() {
+    if (!showDupFor) return;
+    try {
+      await BoatsApi.duplicate(showDupFor.id, {
+        newSlug: dupSlug.trim(),
+        newName: dupName.trim() || undefined,
+        newModelYear: dupYear === undefined ? undefined : Number(dupYear)
+      });
+      setShowDupFor(null);
+      load();
+    } catch (e:any) { alert(e.message || e); }
+  }
+
   return (
-    <QueryClientProvider client={queryClient}>
-      <BoatsScreen />
-    </QueryClientProvider>
-  );
-}
+    <div className="space-y-4">
+      <h1 className="text-3xl font-semibold">Boats</h1>
 
-function BoatsScreen() {
- const { data: boats, isLoading, error } = useQuery({
-    queryKey: ["boats"],
-    queryFn: () => AdminApi.listBoats()
-});
-const [editingBoat, setEditingBoat] = useState<Boat | null>(null);
-
-return (
-    <main className="max-w-5xl mx-auto p-6 space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Boats</h1>
-        <button
-          className="px-2 py-2 rounded bg-black text-white"
-          onClick={() => setEditingBoat({ id: "", slug: "", name: "", basePrice: 0, modelYear: null, isActive: true })}
-        >
-          + New Boat
-        </button>
+        <div className="relative w-96">
+          <Search className="size-4 absolute left-2 top-1/2 -translate-y-1/2 text-white/50" />
+          <input
+            value={search}
+            onChange={(e)=>setSearch(e.target.value)}
+            placeholder="Search..."
+            className="w-full pl-8 pr-3 py-2 rounded-md bg-[#121212] border border-white/10 text-sm outline-none focus:ring-2 focus:ring-white/20"
+          />
+        </div>
+
+        <Link href="/admin/boats/new" className="inline-flex items-center gap-2 rounded-full border border-amber-600/50 text-amber-400 px-3 py-1.5 hover:bg-amber-500/10">
+          <Plus className="size-4" /> Add New
+        </Link>
       </div>
 
-      {isLoading && <p>Loading...</p>}
-      {error && <p className="text-red-500">Error loading boats.</p>}
-
-      <table className="w-full text-sm border">
-        <thead className="bg-gray-50">
-          <tr>
-            <th className="p-2 text-left">Name</th>
-            <th className="p-2 text-left">Slug</th>
-            <th className="p-2 text-left">Base Price</th>
-            <th className="p-2 text-left">Model Year</th>
-            <th className="p-2 text-left">Active</th>
-            <th className="p-2 text-left">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {boats?.map((b) => (
-            <BoatRow key={b.id} boat={b} onEdit={() => setEditingBoat(b)} />
-          ))}
-          {!boats?.length && !isLoading && (
+      <div className="rounded-lg border border-white/10 bg-[#1f1f1f] overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-black/30 border-b border-white/10 text-white/80">
             <tr>
-              <td className="p-4 text-center text-gray-500" colSpan={6}>
-                No boats yet.
-              </td>
+              <th className="text-left px-4 py-2 w-32">Model Year</th>
+              <th className="text-left px-4 py-2">Name</th>
+              <th className="text-left px-4 py-2 w-28">Status</th>
+              <th className="px-2 py-2 w-[120px]"></th>
             </tr>
-          )}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {rows.map((b, i) => (
+              <tr key={b.id} className={`${i%2===0?"bg-white/[0.02]":""} border-b border-white/5`}>
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <div className="size-8 rounded bg-black/50 border border-white/10 overflow-hidden">
+                      {b.heroImageUrl ? (
+                        <Image src={b.heroImageUrl} alt="" width={32} height={32} className="w-8 h-8 object-cover" />
+                      ) : (
+                        <div className="w-8 h-8 flex items-center justify-center text-white/40">🚤</div>
+                      )}
+                    </div>
+                    <span className="font-mono">{b.modelYear ?? "-"}</span>
+                  </div>
+                </td>
+                <td className="px-4 py-3">
+                  <Link href={`/admin/boats/${b.id}`} className="hover:underline">{b.name}</Link>
+                  <div className="text-white/50 text-xs">{b.slug}</div>
+                </td>
+                <td className="px-4 py-3">
+                  {b.isActive ? (
+                    <span className="inline-flex items-center rounded-full bg-emerald-600/20 text-emerald-300 px-2 py-0.5 text-xs">Active</span>
+                  ) : (
+                    <span className="inline-flex items-center rounded-full bg-white/10 text-white/70 px-2 py-0.5 text-xs">Inactive</span>
+                  )}
+                </td>
+                <td className="px-2 py-3 text-right">
+                  <div className="inline-flex items-center gap-2">
+                    <button
+                      onClick={() => toggleActive(b.id)}
+                      title="Toggle active"
+                      className="p-1.5 rounded-full border border-white/15 hover:bg-white/10"
+                    >
+                      <RefreshCw className="size-4" />
+                    </button>
+                    <button
+                      onClick={() => openDup(b)}
+                      title="Duplicate"
+                      className="p-1.5 rounded-full border border-white/15 hover:bg-white/10"
+                    >
+                      <Copy className="size-4" />
+                    </button>
+                    <button
+                      onClick={() => deleteBoat(b.id)}
+                      title="Delete"
+                      className="p-1.5 rounded-full border border-white/15 hover:bg-white/10"
+                    >
+                      <Trash2 className="size-4" />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+            {busy && (
+              <tr><td colSpan={4} className="px-4 py-8 text-center text-white/60">Loading…</td></tr>
+            )}
+            {!busy && rows.length === 0 && (
+              <tr><td colSpan={4} className="px-4 py-8 text-center text-white/60">No boats found.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
 
-      {editingBoat && <BoatForm initial={editingBoat} onClose={() => setEditingBoat(null)} />}
-    </main>
-);
-}
+      {/* Duplicate modal */}
+      {showDupFor && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <div className="w-[520px] rounded-lg border border-white/10 bg-[#1f1f1f] p-4">
+            <h3 className="text-lg font-semibold mb-2">Duplicate “{showDupFor.name}”</h3>
+            <div className="space-y-3">
+              <div>
+                <label className="text-sm text-white/70">New Slug</label>
+                <input value={dupSlug} onChange={e=>setDupSlug(e.target.value)} className="w-full bg-transparent border-b border-white/20 focus:border-white/40 outline-none py-2" />
+              </div>
+              <div>
+                <label className="text-sm text-white/70">New Name</label>
+                <input value={dupName} onChange={e=>setDupName(e.target.value)} className="w-full bg-transparent border-b border-white/20 focus:border-white/40 outline-none py-2" />
+              </div>
+              <div>
+                <label className="text-sm text-white/70">New Model Year</label>
+                <input type="number" value={dupYear} onChange={e=>setDupYear(e.target.value ? Number(e.target.value) : undefined)} className="w-full bg-transparent border-b border-white/20 focus:border-white/40 outline-none py-2" />
+              </div>
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button onClick={()=>setShowDupFor(null)} className="px-3 py-1.5 rounded-md border border-white/15">Cancel</button>
+              <button onClick={doDuplicate} className="px-3 py-1.5 rounded-md bg-amber-600 hover:bg-amber-500 text-black">Create Copy</button>
+            </div>
+          </div>
+        </div>
+      )}
 
-function BoatRow({ boat, onEdit }: { boat: Boat; onEdit: () => void }) {
-    const queryClient = useQueryClient();
-    const deleteMutation = useMutation({
-        mutationFn: () => AdminApi.delete(`/api/admin/boats/${boat.id}`),
-        onSuccess: () => queryClient.invalidateQueries({ queryKey: ["boats"] })
-    });
-    
-    return (
-        <tr className="border-t">
-            <td className="p-2">{boat.name}</td>
-            <td className="p-2">{boat.slug}</td>
-            <td className="p-2">${boat.basePrice.toFixed(2)}</td>
-            <td className="p-2">{boat.modelYear || "-"}</td>
-            <td className="p-2 text-center">
-                <span className={`px-2 py-1 rounded text-xs ${boat.isActive ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-600"}`}>
-                {boat.isActive ? "Yes" : "No"}
-                </span>
-            </td>
-            <td className="p-2 space-x-2">
-                <button className="px-2 py-1 rounded bg-gray-200" onClick={onEdit}>Edit</button>
-                <Link href={`/admin/categories/${boat.id}`} className="px-2 py-1 rounded bg-blue-200">Categories</Link>
-                <button className="text-red-600" onClick={() => confirm("Delete boat?") && deleteMutation.mutate()} disabled={deleteMutation.isPending}>
-          Delete
-        </button>
-            </td>
-        </tr>
-    );  
-}
-
-type BoatFormData = {
-    id: string;
-    slug: string;
-    name: string;
-    basePrice: number;
-    modelYear?: number | null;
-    isActive: boolean;
-}
-
-function BoatForm({ initial, onClose }: { initial: Boat; onClose: () => void }) {
-    const queryClient = useQueryClient();
-    const { register, handleSubmit, formState: { errors, isDirty }, reset } = useForm<BoatFormData>({ defaultValues:  {
-        id: initial.id,
-        slug: initial.slug,
-        name: initial.name,
-        basePrice: initial.basePrice,
-        modelYear: initial.modelYear || undefined,
-        isActive: initial.isActive
-    } });
-    const save = useMutation({
-    mutationFn: (data: BoatFormData) => AdminApi.upsertBoat(data.id || undefined, {
-      slug: data.slug,
-        name: data.name,
-        basePrice: Number(data.basePrice),
-        modelYear: data.modelYear ? Number(data.modelYear) : null,
-        isActive: data.isActive
-    }),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["boats"] }); onClose(); }
-  });
-  
-  return(
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center">
-        <form onSubmit={handleSubmit(data => save.mutate(data))} className="bg-white w-full max-w-lg p-6 rounded space-y-4">
-            <h2 className="text-lg font-semibold">{initial.id ? "Edit Boat" : "New Boat"}</h2>
-            <div>
-                <label className="block text-sm mb-1">Name</label>
-                <input type="text" {...register("name", { required: "Name is required" })} className="w-full border p-2 rounded" />
-                {errors.name && <p className="text-red-500 text-sm mt-1">{errors.name.message}</p>}
-            </div>
-            <div>
-                <label className="block text-sm mb-1">Slug</label>
-                <input type="text" {...register("slug", { required: "Slug is required" })} className="w-full border p-2 rounded" />
-                {errors.slug && <p className="text-red-500 text-sm mt-1">{errors.slug.message}</p>}
-            </div>
-            <div>
-                <label className="block text-sm mb-1">Base Price</label>
-                <input type="number" step="0.01" {...register("basePrice", { required: "Base Price is required", valueAsNumber: true })} className="w-full border p-2 rounded" />
-                {errors.basePrice && <p className="text-red-500 text-sm mt-1">{errors.basePrice.message}</p>}
-            </div>
-            <div>
-                <label className="block text-sm mb-1">Model Year</label>
-                <input type="number" {...register("modelYear", { valueAsNumber: true })} className="w-full border p-2 rounded" />
-                {errors.modelYear && <p className="text-red-500 text-sm mt-1">{errors.modelYear.message}</p>}
-            </div>
-            <div className="flex items-center space-x-2">
-                <input type="checkbox" {...register("isActive")} className="h-4 w-4" />
-                <label className="text-sm">Is Active</label>
-            </div>
-            <div className="flex items-center space-x-4">
-                <button type="submit" disabled={!isDirty || save.isPending} className="px-4 py-2 rounded bg-black text-white disabled:opacity-50">
-                    {save.isPending ? "Saving..." : "Save"}
-                </button>
-                <button type="button" onClick={() => { reset(); onClose(); }} className="px-4 py-2 rounded border">
-                    Cancel
-                </button>
-            </div>
-        </form>
+      {error && <div className="text-red-400 text-sm">{error}</div>}
     </div>
-  )
+  );
 }

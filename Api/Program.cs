@@ -66,10 +66,10 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-var admin = app.MapGroup("/api/admin").RequireAuthorization("Admin");
+var admin = app.MapGroup("/admin").RequireAuthorization("Admin");
 
 //Login - issue JWT
-app.MapPost("/api/auth/login", async (LoginRequest req, AppDb db) =>
+app.MapPost("/auth/login", async (LoginRequest req, AppDb db) =>
 {
     //find user by email
     var email = req.Email.Trim().ToLowerInvariant();
@@ -112,7 +112,7 @@ app.MapPost("/api/auth/login", async (LoginRequest req, AppDb db) =>
 });
 
 //Forgot password
-app.MapPost("api/auth/forgot-password", async (ForgotPasswordRequest req, AppDb db) =>
+app.MapPost("/auth/forgot-password", async (ForgotPasswordRequest req, AppDb db) =>
 {
     var email = req.Email.Trim().ToLowerInvariant();
     var user = await db.Set<AppUser>()
@@ -138,7 +138,7 @@ app.MapPost("api/auth/forgot-password", async (ForgotPasswordRequest req, AppDb 
 });
 
 //Reset password
-app.MapPost("api/auth/reset-password", async (ResetPasswordRequest req, AppDb db) =>
+app.MapPost("/auth/reset-password", async (ResetPasswordRequest req, AppDb db) =>
 {
     var reset = await db.Database.SqlQueryRaw<(Guid UserId, DateTime ExpiresAt)>(
          "SELECT user_id, expires_at FROM password_resets WHERE token = @token",
@@ -161,14 +161,14 @@ app.MapPost("api/auth/reset-password", async (ResetPasswordRequest req, AppDb db
 });
 
 //List active boats
-app.MapGet("/api/boats", async (AppDb db) =>
+app.MapGet("/boats", async (AppDb db) =>
  Results.Ok(await db.Boats.Where(b => b.IsActive)
  .Select(b => new { b.Slug, b.Name, b.BasePrice })
  .OrderBy(b => b.Name)
  .ToListAsync()));
 
 //List roles
-admin.MapGet("/api/roles", async (HttpRequest http, AppDb db) =>
+admin.MapGet("/roles", async (HttpRequest http, AppDb db) =>
 {
     var search = http.Query["search"].ToString()?.Trim().ToLower();
     var q = db.Roles.AsNoTracking();
@@ -180,7 +180,7 @@ admin.MapGet("/api/roles", async (HttpRequest http, AppDb db) =>
 });
 
 //Create role
-admin.MapPost("/api/roles", async (RoleUpsert dto, AppDb db) =>
+admin.MapPost("/roles", async (RoleUpsert dto, AppDb db) =>
 {
     var name = dto.Name.Trim();
     var slug = (dto.Slug ?? dto.Name).Trim().ToLower().Replace(" ", "-");
@@ -198,11 +198,11 @@ admin.MapPost("/api/roles", async (RoleUpsert dto, AppDb db) =>
     };
     db.Roles.Add(r);
     await db.SaveChangesAsync();
-    return Results.Created($"/api/admin/roles/{r.Id}", r);
+    return Results.Created($"/admin/roles/{r.Id}", r);
 });
 
 //Update role
-admin.MapPatch("/api/roles/{id:guid}", async (Guid id, RoleUpsert dto, AppDb db) =>
+admin.MapPatch("/roles/{id:guid}", async (Guid id, RoleUpsert dto, AppDb db) =>
 {
     var r = await db.Roles.FindAsync(id);
     if (r is null) return Results.NotFound();
@@ -217,7 +217,7 @@ admin.MapPatch("/api/roles/{id:guid}", async (Guid id, RoleUpsert dto, AppDb db)
 });
 
 //Delete role
-admin.MapDelete("/api/roles/{id:guid}", async (Guid id, AppDb db) =>
+admin.MapDelete("/roles/{id:guid}", async (Guid id, AppDb db) =>
 {
     var r = await db.Roles.FindAsync(id);
     if (r is null) return Results.NotFound();
@@ -228,21 +228,21 @@ admin.MapDelete("/api/roles/{id:guid}", async (Guid id, AppDb db) =>
 });
 
 //get all timezones
-app.MapGet("/api/settings", async (AppDb db) =>
+app.MapGet("/settings", async (AppDb db) =>
 {
     var items = await db.Set<AppSettings>().OrderBy(s => s.key).Select(s => new SettingDto(s.key, s.value)).ToListAsync();
     return Results.Ok(new { items });
 });
 
 //get Single
-admin.MapGet("/api/settings/{key}", async (string key, AppDb db) =>
+admin.MapGet("/settings/{key}", async (string key, AppDb db) =>
 {
     var s = await db.Set<AppSettings>().FindAsync(key);
     return s is null ? Results.NotFound() : Results.Ok(new SettingDto(s.key, s.value));
 });
 
 //upset single
-admin.MapPut("/api/settings/{key}", async (string key, SettingDto dto, AppDb db) =>
+admin.MapPut("/settings/{key}", async (string key, SettingDto dto, AppDb db) =>
 {
     var s = await db.Set<AppSettings>().FindAsync(key);
     if (s is null)
@@ -260,14 +260,14 @@ admin.MapPut("/api/settings/{key}", async (string key, SettingDto dto, AppDb db)
 });
 
 //get timezones
-admin.MapGet("/api/settings/timezones", async (AppDb db) =>
+admin.MapGet("/settings/timezones", async (AppDb db) =>
 {
     var tz = await db.Settings.AsNoTracking().Where(s => s.key == "system.timezones").Select(s => s.value).FirstOrDefaultAsync();
     return Results.Ok(new { value = tz ?? "UTC" });
 });
 
 //set timezones
-admin.MapPut("/api/settings/timezones", async (SettingDto dto, AppDb db) =>
+admin.MapPut("settings/timezones", async (SettingDto dto, AppDb db) =>
 {
     var s = await db.Settings.FindAsync("system.timezones");
     if (s is null)
@@ -285,7 +285,7 @@ admin.MapPut("/api/settings/timezones", async (SettingDto dto, AppDb db) =>
 });
 
 //Boat config 
-app.MapGet("/api/boats/{slug}/config", async (string slug, AppDb db) =>
+app.MapGet("/boats/{slug}/config", async (string slug, AppDb db) =>
 {
     var sql = "SELECT * FROM v_boat_config WHERE slug = @slug";
     var param = new NpgsqlParameter("slug", slug);
@@ -294,7 +294,7 @@ app.MapGet("/api/boats/{slug}/config", async (string slug, AppDb db) =>
 });
 
 //Price + save build
-app.MapPost("/api/builds", async (
+app.MapPost("/builds", async (
     PriceRequest req,
     AppDb db,
     PricingEngine pricer,
@@ -409,7 +409,7 @@ admin.MapPost("/users", async (UpsertUser dto, AppDb db) =>
     };
     db.Add(u);
     await db.SaveChangesAsync();
-    return Results.Created($"/api/admin/users/{u.Id}", new { u.Id });
+    return Results.Created($"/admin/users/{u.Id}", new { u.Id });
 });
 
 //Update user
@@ -452,8 +452,16 @@ admin.MapDelete("/users/{id:guid}", async (Guid id, AppDb db) =>
 
 
 //Boats
-admin.MapGet("/boats", async (AppDb db) =>
-            Results.Ok(await db.Boats.OrderBy(x => x.Name).ToListAsync()));
+admin.MapGet("/boats", async (HttpRequest req, AppDb db) =>
+{
+    var search = (req.Query["search"].ToString() ?? "").Trim().ToLowerInvariant();
+    var q = db.Boats.AsNoTracking();
+    if (!string.IsNullOrWhiteSpace(search))
+        q = q.Where(b => b.Name.ToLower().Contains(search) || b.Slug.ToLower().Contains(search));
+
+    var items = await q.OrderByDescending(b => b.ModelYear).ThenBy(b => b.Name).ToListAsync();
+    return Results.Ok(new { items });
+});
 
 //Create boat
 admin.MapPost("/boats", async (BoatUpsert dto, AppDb db) =>
@@ -461,7 +469,42 @@ admin.MapPost("/boats", async (BoatUpsert dto, AppDb db) =>
     var b = new Boat { Id = Guid.NewGuid(), Slug = dto.Slug, Name = dto.Name, BasePrice = dto.BasePrice, ModelYear = dto.ModelYear, IsActive = true };
     db.Boats.Add(b);
     await db.SaveChangesAsync();
-    return Results.Created($"/api/admin/boats/{b.Id}", b);
+    return Results.Created($"/admin/boats/{b.Id}", b);
+});
+
+//toggle active boat
+admin.MapPost("/boats/{id:guid}/toggle-active", async (Guid id, AppDb db) =>
+{
+    var b = await db.Boats.FindAsync(id);
+    if (b is null) return Results.NotFound();
+    b.IsActive = !b.IsActive;
+    await db.SaveChangesAsync();
+    return Results.Ok(b);
+});
+
+//duplicate boat
+admin.MapPost("/boats/{id:guid}/duplicate", async (Guid id, DuplicateBoatDto dto, AppDb db) =>
+{
+    var src = await db.Boats.FindAsync(id);
+    if (src is null) return Results.NotFound();
+
+    if (await db.Boats.AnyAsync(b => b.Slug == dto.NewSlug))
+        return Results.Conflict(new { message = "Boat with same slug already exists" });
+
+    var copy = new Boat
+    {
+        Id = Guid.NewGuid(),
+        Slug = dto.NewSlug,
+        Name = string.IsNullOrWhiteSpace(dto.NewName) ? $"{src.Name} Copy" : dto.NewName!,
+        BasePrice = src.BasePrice,
+        ModelYear = dto.NewModelYear ?? src.ModelYear,
+        IsActive = false,
+        HeroImageUrl = src.HeroImageUrl
+    };
+
+    db.Boats.Add(copy);
+    await db.SaveChangesAsync();
+    return Results.Created($"/admin/boats/{copy.Id}", copy);
 });
 
 //Update boat
@@ -497,7 +540,7 @@ admin.MapPost("/categories", async (CategoryUpsert dto, AppDb db) =>
     var c = new Category { Id = Guid.NewGuid(), BoatId = dto.BoatId, Name = dto.Name, SortOrder = dto.SortOrder, IsRequired = dto.IsRequired };
     db.Categories.Add(c);
     await db.SaveChangesAsync();
-    return Results.Created($"/api/admin/categories/{c.Id}", c);
+    return Results.Created($"/admin/categories/{c.Id}", c);
 });
 
 //
@@ -542,7 +585,7 @@ admin.MapPost("/option-groups", async (OptionGroupUpsert dto, AppDb db) =>
     };
     db.OptionGroups.Add(g);
     await db.SaveChangesAsync();
-    return Results.Created($"/api/admin/option-groups/{g.Id}", g);
+    return Results.Created($"/admin/option-groups/{g.Id}", g);
 });
 
 // Update option group
@@ -591,7 +634,7 @@ admin.MapPost("/options", async (OptionUpsert dto, AppDb db) =>
     };
     db.Options.Add(o);
     await db.SaveChangesAsync();
-    return Results.Created($"/api/admin/options/{o.id}", o);
+    return Results.Created($"/admin/options/{o.id}", o);
 });
 
 // Update option
