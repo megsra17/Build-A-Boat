@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Cog, Gauge, Users, Ship, Shield } from "lucide-react";
-import UserMenu from "../components/UserMenu";
+import UserMenu from "../../components/UserMenu";
 
 const nav = [
   { href: "/admin", label: "Dashboard", icon: Gauge },

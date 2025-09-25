@@ -50,8 +50,8 @@ export default function AdminLoginPage() {
 
   function devBypass() {
     const token = "DEV_FAKE_TOKEN";
-    if (remember) localStorage.setItem("admin_jwt", token);
-    else sessionStorage.setItem("admin_jwt", token);
+    if (remember) localStorage.setItem("jwt", token);
+    else sessionStorage.setItem("jwt", token);
     localStorage.setItem("admin_user", JSON.stringify({ email, role: "admin" }));
     document.cookie = `admin=ok; Path=/; Max-Age=${60 * 60 * 8}`;
     r.replace(next);

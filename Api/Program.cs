@@ -167,6 +167,66 @@ app.MapGet("/api/boats", async (AppDb db) =>
  .OrderBy(b => b.Name)
  .ToListAsync()));
 
+//List roles
+admin.MapGet("/api/roles", async (HttpRequest http, AppDb db) =>
+{
+    var search = http.Query["search"].ToString()?.Trim().ToLower();
+    var q = db.Roles.AsNoTracking();
+    if (!string.IsNullOrEmpty(search))
+        q = q.Where(r => r.Name.ToLower().Contains(search) || r.Slug.ToLower().Contains(search));
+
+    var items = await q.OrderBy(r => r.Name).ToListAsync();
+    return Results.Ok(new { items });
+});
+
+//Create role
+admin.MapPost("/api/roles", async (RoleUpsert dto, AppDb db) =>
+{
+    var name = dto.Name.Trim();
+    var slug = (dto.Slug ?? dto.Name).Trim().ToLower().Replace(" ", "-");
+
+    var exists = await db.Roles.AnyAsync(r => r.Name == name || r.Slug == slug);
+    if (exists) return Results.Conflict(new { message = "Role with same name or slug already exists" });
+
+    var r = new AppRole
+    {
+        Id = Guid.NewGuid(),
+        Name = name,
+        Slug = slug,
+        CreatedAt = DateTime.UtcNow,
+        UpdatedAt = DateTime.UtcNow
+    };
+    db.Roles.Add(r);
+    await db.SaveChangesAsync();
+    return Results.Created($"/api/admin/roles/{r.Id}", r);
+});
+
+//Update role
+admin.MapPatch("/api/roles/{id:guid}", async (Guid id, RoleUpsert dto, AppDb db) =>
+{
+    var r = await db.Roles.FindAsync(id);
+    if (r is null) return Results.NotFound();
+
+    r.Name = dto.Name.Trim();
+    if (!string.IsNullOrWhiteSpace(dto.Slug))
+        r.Slug = dto.Slug.Trim().ToLower().Replace(" ", "-");
+
+    r.UpdatedAt = DateTime.UtcNow;
+    await db.SaveChangesAsync();
+    return Results.Ok(r);
+});
+
+//Delete role
+admin.MapDelete("/api/roles/{id:guid}", async (Guid id, AppDb db) =>
+{
+    var r = await db.Roles.FindAsync(id);
+    if (r is null) return Results.NotFound();
+
+    db.Roles.Remove(r);
+    await db.SaveChangesAsync();
+    return Results.NoContent();
+});
+
 //Boat config 
 app.MapGet("/api/boats/{slug}/config", async (string slug, AppDb db) =>
 {
@@ -241,6 +301,7 @@ admin.MapGet("/users/count", async (AppDb db) =>
     return Results.Ok(new { count });
 });
 
+//User list with paging
 admin.MapGet("/users", async (HttpRequest http, AppDb db) =>
 {
     //query params
@@ -269,6 +330,7 @@ admin.MapGet("/users", async (HttpRequest http, AppDb db) =>
     return Results.Ok(new { total, page, pageSize, items });
 });
 
+//Create user
 admin.MapPost("/users", async (UpsertUser dto, AppDb db) =>
 {
     var exists = await db.Set<AppUser>().AnyAsync(u => u.Email == dto.Email);
@@ -293,6 +355,7 @@ admin.MapPost("/users", async (UpsertUser dto, AppDb db) =>
     return Results.Created($"/api/admin/users/{u.Id}", new { u.Id });
 });
 
+//Update user
 admin.MapPatch("users/{id:guid}", async (Guid id, UpsertUser dto, AppDb db) =>
 {
     var u = await db.Set<AppUser>().FindAsync(id);
@@ -320,6 +383,7 @@ admin.MapPatch("users/{id:guid}", async (Guid id, UpsertUser dto, AppDb db) =>
     return Results.Ok(new { u.Id });
 });
 
+//Delete user
 admin.MapDelete("/users/{id:guid}", async (Guid id, AppDb db) =>
 {
     var u = await db.Set<AppUser>().FindAsync(id);
@@ -334,6 +398,7 @@ admin.MapDelete("/users/{id:guid}", async (Guid id, AppDb db) =>
 admin.MapGet("/boats", async (AppDb db) =>
             Results.Ok(await db.Boats.OrderBy(x => x.Name).ToListAsync()));
 
+//Create boat
 admin.MapPost("/boats", async (BoatUpsert dto, AppDb db) =>
 {
     var b = new Boat { Id = Guid.NewGuid(), Slug = dto.Slug, Name = dto.Name, BasePrice = dto.BasePrice, ModelYear = dto.ModelYear, IsActive = true };
@@ -342,6 +407,7 @@ admin.MapPost("/boats", async (BoatUpsert dto, AppDb db) =>
     return Results.Created($"/api/admin/boats/{b.Id}", b);
 });
 
+//Update boat
 admin.MapPatch("/boats/{id:guid}", async (Guid id, BoatUpsert dto, AppDb db) =>
 {
     var b = await db.Boats.FindAsync(id);
@@ -354,6 +420,7 @@ admin.MapPatch("/boats/{id:guid}", async (Guid id, BoatUpsert dto, AppDb db) =>
     return Results.Ok(b);
 });
 
+//Delete boat
 admin.MapDelete("/boats/{id:guid}", async (Guid id, AppDb db) =>
 {
     var b = await db.Boats.FindAsync(id);
@@ -367,6 +434,7 @@ admin.MapDelete("/boats/{id:guid}", async (Guid id, AppDb db) =>
 admin.MapGet("/boats/{boatId:guid}/categories", async (Guid boatId, AppDb db) =>
     Results.Ok(await db.Categories.Where(c => c.BoatId == boatId).OrderBy(c => c.SortOrder).ToListAsync()));
 
+// Create category
 admin.MapPost("/categories", async (CategoryUpsert dto, AppDb db) =>
 {
     var c = new Category { Id = Guid.NewGuid(), BoatId = dto.BoatId, Name = dto.Name, SortOrder = dto.SortOrder, IsRequired = dto.IsRequired };
@@ -375,6 +443,7 @@ admin.MapPost("/categories", async (CategoryUpsert dto, AppDb db) =>
     return Results.Created($"/api/admin/categories/{c.Id}", c);
 });
 
+//
 admin.MapPatch("/categories/{id:guid}", async (Guid id, CategoryUpsert dto, AppDb db) =>
 {
     var c = await db.Categories.FindAsync(id);
@@ -387,6 +456,7 @@ admin.MapPatch("/categories/{id:guid}", async (Guid id, CategoryUpsert dto, AppD
     return Results.Ok(c);
 });
 
+// Delete category
 admin.MapDelete("/categories/{id:guid}", async (Guid id, AppDb db) =>
 {
     var c = await db.Categories.FindAsync(id);
@@ -400,6 +470,7 @@ admin.MapDelete("/categories/{id:guid}", async (Guid id, AppDb db) =>
 admin.MapGet("/categories/{categoryId:guid}/option-groups", async (Guid categoryId, AppDb db) =>
     Results.Ok(await db.OptionGroups.Where(g => g.CategoryId == categoryId).OrderBy(g => g.SortOrder).ToListAsync()));
 
+// Create option group
 admin.MapPost("/option-groups", async (OptionGroupUpsert dto, AppDb db) =>
 {
     var g = new OptionGroup
@@ -417,6 +488,7 @@ admin.MapPost("/option-groups", async (OptionGroupUpsert dto, AppDb db) =>
     return Results.Created($"/api/admin/option-groups/{g.Id}", g);
 });
 
+// Update option group
 admin.MapPatch("/option-groups/{id:guid}", async (Guid id, OptionGroupUpsert dto, AppDb db) =>
 {
     var g = await db.OptionGroups.FindAsync(id);
@@ -431,6 +503,7 @@ admin.MapPatch("/option-groups/{id:guid}", async (Guid id, OptionGroupUpsert dto
     return Results.Ok(g);
 });
 
+// Delete option group
 admin.MapDelete("/option-groups/{id:guid}", async (Guid id, AppDb db) =>
 {
     var g = await db.OptionGroups.FindAsync(id);
@@ -444,6 +517,7 @@ admin.MapDelete("/option-groups/{id:guid}", async (Guid id, AppDb db) =>
 admin.MapGet("/option-groups/{groupId:guid}/options", async (Guid groupId, AppDb db) =>
     Results.Ok(await db.Options.Where(o => o.OptionGroupId == groupId).ToListAsync()));
 
+// Create option
 admin.MapPost("/options", async (OptionUpsert dto, AppDb db) =>
 {
     var o = new Option
@@ -463,6 +537,7 @@ admin.MapPost("/options", async (OptionUpsert dto, AppDb db) =>
     return Results.Created($"/api/admin/options/{o.id}", o);
 });
 
+// Update option
 admin.MapPatch("/options/{id:guid}", async (Guid id, OptionUpsert dto, AppDb db) =>
 {
     var o = await db.Options.FindAsync(id);
@@ -479,6 +554,7 @@ admin.MapPatch("/options/{id:guid}", async (Guid id, OptionUpsert dto, AppDb db)
     return Results.Ok(o);
 });
 
+// Delete option
 admin.MapDelete("/options/{id:guid}", async (Guid id, AppDb db) =>
 {
     var o = await db.Options.FindAsync(id);

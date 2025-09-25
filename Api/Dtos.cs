@@ -5,6 +5,8 @@ public record CategoryUpsert(Guid BoatId, string Name, int SortOrder, bool IsReq
 public record OptionGroupUpsert(Guid CategoryId, string Name, string SelectionType, int MinSelect, int MaxSelect, int SortOrder);
 public record OptionUpsert(Guid OptionGroupId, string? Sku, string Label, string? Description, decimal PriceDelta, string? ImageUrl, bool IsDefault, bool IsActive, int SortOrder);
 
+public record RoleUpsert(string Name, string Slug);
+
 // ===== Auth =====
 public record ForgetPasswordRequest(string Email);
 public record ResetPasswordRequest(string Token, string NewPassword);

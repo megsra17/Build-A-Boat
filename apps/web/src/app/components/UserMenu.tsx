@@ -33,7 +33,7 @@ export default function UserMenu({ user }: { user: UserInfo }) {
 
   function logout() {
     try {
-      localStorage.removeItem("admin_jwt");
+      localStorage.removeItem("jwt");
       localStorage.removeItem("admin_user");
       document.cookie = "admin=; Path=/; Max-Age=0";
     } catch {}

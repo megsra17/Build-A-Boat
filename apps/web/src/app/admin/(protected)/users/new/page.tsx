@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useRef } from "react";
 import {Eye, EyeOff, Upload, Check} from "lucide-react";
-import { UsersApi } from "../../../lib/admin-api";
+import { UsersApi } from "../../../../lib/admin-api";
 import { Roles, Timezones } from "@/app/lib/constants"; 
 
 export default function NewUserPage() {

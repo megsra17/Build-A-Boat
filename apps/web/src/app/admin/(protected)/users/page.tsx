@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { UsersApi, UserRow } from "../../lib/admin-api";
+import { UsersApi, UserRow } from "../../../lib/admin-api";
 import { Search, X } from "lucide-react";
-import { useRouter } from "next/router";
+import Link from "next/link";
 
 function initials(name?: string) {
     if(name && name.trim()){
@@ -29,7 +29,6 @@ export default function UsersPage() {
     const [busy, setBusy] = useState(false);
     const [page, setPage] = useState(1);
     const pageSize = 25;
-    const router = useRouter();
 
     async function load(){
         setBusy(true);
@@ -80,7 +79,12 @@ export default function UsersPage() {
                         </button>
                     )}
                 </div>
-                <button onClick={() => router.push("/admin/users/new")} className="rounded-md bg-amber-600 hover:bg-amber-500 text-black font-medium px-3 py-2 text-sm">Add User</button>
+                <Link
+          href="/admin/users/new"
+          className="rounded-md bg-amber-600 hover:bg-amber-500 text-black font-medium px-3 py-2 text-sm"
+        >
+          Add User
+        </Link>
             </div>
 
             {/* Table */}

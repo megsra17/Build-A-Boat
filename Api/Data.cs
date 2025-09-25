@@ -24,6 +24,7 @@ public class AppDb : DbContext
 {
     public AppDb(DbContextOptions<AppDb> o) : base(o) { }
 
+    public DbSet<AppRole> Roles => Set<AppRole>();
     public DbSet<Boat> Boats => Set<Boat>();
     public DbSet<Category> Categories => Set<Category>();
     public DbSet<OptionGroup> OptionGroups => Set<OptionGroup>();
@@ -45,6 +46,9 @@ public class AppDb : DbContext
         b.Entity<AppUser>().Property(x => x.LastName).HasColumnName("last_name");
         b.Entity<AppUser>().Property(x => x.Timezone).HasColumnName("timezone");
         b.Entity<AppUser>().Property(x => x.AvatarUrl).HasColumnName("avatar_url");
+
+        b.Entity<AppRole>().ToTable("app_role");
+        b.Entity<AppRole>().HasIndex(x => x.Slug).IsUnique();
 
         b.Entity<Boat>().ToTable("boat");
         b.Entity<Category>().ToTable("category");
@@ -72,6 +76,15 @@ public class AppDb : DbContext
         // In the SQL view, alias ends up lowercase unquoted -> pricingrules
         b.Entity<BoatConfigRow>().Property(x => x.pricingRules).HasColumnName("pricingrules");
     }
+}
+
+public class AppRole
+{
+    public Guid Id { get; set; }
+    public string Name { get; set; } = "";
+    public string Slug { get; set; } = "";
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
 }
 
 public class Boat

@@ -6,6 +6,7 @@ export type Boat = { id: string; slug: string; name: string; basePrice: number; 
 export type Category = { id: string; boatId: string; name: string; sortOrder: number; isRequired: boolean; };
 export type OptionGroup = { id: string; categoryId: string; name: string; selectionType: string; minSelect: number; maxSelect: number; sortOrder: number; };
 export type OptionItem = { id: string; optionGroupId: string; sku?: string|null; label: string; description?: string|null; priceDelta: number; imageUrl?: string|null; isDefault: boolean; isActive: boolean; sortOrder: number; };
+export type Role = { id: string; name: string; slug: string; };
 
 async function j<T>(r: Response){ if(!r.ok) throw new Error(await r.text()); return r.json() as Promise<T>; }
 
@@ -71,4 +72,17 @@ export const AdminApi = {
     fetch(`${API}${path}`, { method: "DELETE", headers: { ...authHeaders() } }).then((r) => {
       if (!r.ok) throw new Error("Delete failed");
     })
+};
+
+export const RolesApi = {
+  list: (search?: string) => {
+    const qs = search ? `?search=${encodeURIComponent(search)}` : "";
+    return authFetch(`${API}/api/admin/roles${qs}`, { cache: "no-store" }).then(j<{items: Role[]}>);
+  },
+  create: (body: { name: string; slug?: string }) =>
+    authFetch(`${API}/api/admin/roles`, { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) }).then(j<Role>),
+  update: (id: string, body: Partial<{ name: string; slug: string }>) =>
+    authFetch(`${API}/api/admin/roles/${id}`, { method:"PATCH", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) }).then(j<Role>),
+  delete: (id: string) =>
+    authFetch(`${API}/api/admin/roles/${id}`, { method:"DELETE" }).then(async r => { if(!r.ok) throw new Error(await r.text()); }),
 };
