@@ -24,6 +24,16 @@ export type UserRow = {
   updatedAt: Date;
 }
 
+export const SettingsApi = {
+  getTimezone: () => authFetch(`${API}/api/admin/settings/timezone`, {cache: "no-store"}).then(j<{value: string}>).then(r => r.value),
+  setTimezone: (value: string) =>
+    authFetch(`${API}/api/admin/settings/system/timezone`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key: "system.timezone", value }),
+    }).then(j<{ value: string }>),
+}
+
 export const UsersApi = {
   list: (opts?: {search?: string; page?: number; pageSize?: number}) =>{
     const p = new URLSearchParams();

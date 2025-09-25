@@ -33,6 +33,8 @@ public class AppDb : DbContext
     public DbSet<PricingRule> PricingRules => Set<PricingRule>();
     public DbSet<Build> Builds => Set<Build>();
 
+    public DbSet<AppSettings> Settings => Set<AppSettings>();
+
     //keyless entity for boat config view
     public DbSet<BoatConfigRow> BoatConfigs => Set<BoatConfigRow>();
 
@@ -49,6 +51,10 @@ public class AppDb : DbContext
 
         b.Entity<AppRole>().ToTable("app_role");
         b.Entity<AppRole>().HasIndex(x => x.Slug).IsUnique();
+
+        b.Entity<AppSettings>().ToTable("app_settings");
+        b.Entity<AppSettings>().HasKey(x => x.key);
+        b.Entity<AppSettings>().Property(x => x.updatedAt).HasColumnName("updated_at");
 
         b.Entity<Boat>().ToTable("boat");
         b.Entity<Category>().ToTable("category");
@@ -85,6 +91,13 @@ public class AppRole
     public string Slug { get; set; } = "";
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
+}
+
+public class AppSettings
+{
+    public string key { get; set; } = "";
+    public string value { get; set; } = "";
+    public DateTime updatedAt { get; set; }
 }
 
 public class Boat

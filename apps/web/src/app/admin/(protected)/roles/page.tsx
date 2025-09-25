@@ -75,7 +75,7 @@ export default function RolesPage() {
             <div className="flex items-center justify-between">
                 <div className="relative w-80">
                     <Search className="size-4 absolute left-2 top-1/2 -translate-y-1/2 text-white/50"/>
-                     <input className="w-full border border-white/20 bg-transparent py-1 pl-8 pr-2 text-sm text-white placeholder:text-white/50 focus:border-orange-500 focus:outline-none" placeholder="Search roles..." value={search} onChange={e => setSearch(e.target.value)} />
+                     <input className="w-full pl-8 pr-8 py-2 rounded-md bg-[#121212] border border-white/20 text-sm outline-none focus:ring-2 focus:ring-white/10" placeholder="Search roles..." value={search} onChange={e => setSearch(e.target.value)} />
                 </div>
                 <button onClick={() => setNewOpen(o => !o)} className="inline-flex items-center gap-2 rounded-full border border-amber-600/50 text-amber-400 px-3 py-1.5 hover:bg-amber-500/10">
                     <Plus className="size-4" /> New Role

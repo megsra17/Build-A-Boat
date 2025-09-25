@@ -7,6 +7,8 @@ public record OptionUpsert(Guid OptionGroupId, string? Sku, string Label, string
 
 public record RoleUpsert(string Name, string Slug);
 
+public record SettingDto(string Key, string Value);
+
 // ===== Auth =====
 public record ForgetPasswordRequest(string Email);
 public record ResetPasswordRequest(string Token, string NewPassword);

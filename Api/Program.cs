@@ -227,6 +227,63 @@ admin.MapDelete("/api/roles/{id:guid}", async (Guid id, AppDb db) =>
     return Results.NoContent();
 });
 
+//get all timezones
+app.MapGet("/api/settings", async (AppDb db) =>
+{
+    var items = await db.Set<AppSettings>().OrderBy(s => s.key).Select(s => new SettingDto(s.key, s.value)).ToListAsync();
+    return Results.Ok(new { items });
+});
+
+//get Single
+admin.MapGet("/api/settings/{key}", async (string key, AppDb db) =>
+{
+    var s = await db.Set<AppSettings>().FindAsync(key);
+    return s is null ? Results.NotFound() : Results.Ok(new SettingDto(s.key, s.value));
+});
+
+//upset single
+admin.MapPut("/api/settings/{key}", async (string key, SettingDto dto, AppDb db) =>
+{
+    var s = await db.Set<AppSettings>().FindAsync(key);
+    if (s is null)
+    {
+        s = new AppSettings { key = key, value = dto.Value, updatedAt = DateTime.UtcNow };
+        db.Settings.Add(s);
+    }
+    else
+    {
+        s.value = dto.Value;
+        s.updatedAt = DateTime.UtcNow;
+    }
+    await db.SaveChangesAsync();
+    return Results.Ok(new SettingDto(s.key, s.value));
+});
+
+//get timezones
+admin.MapGet("/api/settings/timezones", async (AppDb db) =>
+{
+    var tz = await db.Settings.AsNoTracking().Where(s => s.key == "system.timezones").Select(s => s.value).FirstOrDefaultAsync();
+    return Results.Ok(new { value = tz ?? "UTC" });
+});
+
+//set timezones
+admin.MapPut("/api/settings/timezones", async (SettingDto dto, AppDb db) =>
+{
+    var s = await db.Settings.FindAsync("system.timezones");
+    if (s is null)
+    {
+        s = new AppSettings { key = "system.timezones", value = dto.Value, updatedAt = DateTime.UtcNow };
+        db.Settings.Add(s);
+    }
+    else
+    {
+        s.value = dto.Value;
+        s.updatedAt = DateTime.UtcNow;
+    }
+    await db.SaveChangesAsync();
+    return Results.Ok(new SettingDto(s.key, s.value));
+});
+
 //Boat config 
 app.MapGet("/api/boats/{slug}/config", async (string slug, AppDb db) =>
 {

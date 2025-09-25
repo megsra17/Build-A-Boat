@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { UsersApi, UserRow } from "../../../lib/admin-api";
-import { Search, X } from "lucide-react";
+import { Search, X, Plus } from "lucide-react";
 import Link from "next/link";
 
 function initials(name?: string) {
@@ -81,9 +81,9 @@ export default function UsersPage() {
                 </div>
                 <Link
           href="/admin/users/new"
-          className="rounded-md bg-amber-600 hover:bg-amber-500 text-black font-medium px-3 py-2 text-sm"
+          className="inline-flex items-center gap-2 rounded-full border border-amber-600/50 text-amber-400 px-3 py-1.5 hover:bg-amber-500/10"
         >
-          Add User
+         <Plus className="size-4" /> Add User
         </Link>
             </div>
 
