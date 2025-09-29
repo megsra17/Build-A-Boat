@@ -71,43 +71,76 @@ var admin = app.MapGroup("/admin").RequireAuthorization("Admin");
 //Login - issue JWT
 app.MapPost("/auth/login", async (LoginRequest req, AppDb db) =>
 {
-    //find user by email
-    var email = req.Email.Trim().ToLowerInvariant();
-
-    //app_user table is in DB map quickly via raw query
-    var user = await db.Set<AppUser>()
-        .FromSqlRaw("SELECT id, email, password_hash, role FROM app_user WHERE email = @email",
-            new NpgsqlParameter("email", email))
-        .AsNoTracking()
-        .SingleOrDefaultAsync();
-
-    if (user is null) return Results.Unauthorized();
-
-    //verify password
-    if (!BCrypt.Net.BCrypt.Verify(req.Password, user.PasswordHash)) return Results.Unauthorized();
-
-    //build JWT
-    var jwtSection = app.Configuration.GetSection("Jwt");
-    var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSection["Secret"]!));
-    var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-    var claims = new[]
+    try
     {
-        new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
-        new Claim(JwtRegisteredClaimNames.Email, user.Email),
-        new Claim(ClaimTypes.Role, user.Role)
-    };
+        //find user by email
+        var email = req.Email.Trim().ToLowerInvariant();
+        Console.WriteLine($"[LOGIN] Looking for user with email: {email}");
 
-    var token = new JwtSecurityToken(
-        issuer: jwtSection["Issuer"],
-        audience: jwtSection["Audience"],
-        claims: claims,
-        expires: DateTime.UtcNow.AddHours(8),
-        signingCredentials: creds
-    );
+        //find user using EF but only select essential columns
+        var user = await db.Set<AppUser>()
+            .AsNoTracking()
+            .Where(u => u.Email == email)
+            .Select(u => new AppUser
+            {
+                Id = u.Id,
+                Email = u.Email,
+                PasswordHash = u.PasswordHash,
+                Role = u.Role
+            })
+            .FirstOrDefaultAsync();
 
-    var jwt = new JwtSecurityTokenHandler().WriteToken(token);
+        if (user is null)
+        {
+            Console.WriteLine("[LOGIN] User not found");
+            return Results.Unauthorized();
+        }
 
-    return Results.Ok(new { token, user = new { user.Id, user.Email, user.Role } });
+        Console.WriteLine($"[LOGIN] User found: {user.Email}, Role: {user.Role}");
+        Console.WriteLine($"[LOGIN] Password hash exists: {!string.IsNullOrEmpty(user.PasswordHash)}");
+
+        //verify password
+        var passwordValid = BCrypt.Net.BCrypt.Verify(req.Password, user.PasswordHash);
+        Console.WriteLine($"[LOGIN] Password verification result: {passwordValid}");
+
+        if (!passwordValid)
+        {
+            Console.WriteLine("[LOGIN] Password verification failed");
+            return Results.Unauthorized();
+        }
+
+        Console.WriteLine("[LOGIN] Password verified successfully, generating JWT...");
+
+        //build JWT
+        var jwtSection = app.Configuration.GetSection("Jwt");
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSection["Secret"]!));
+        var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+        var claims = new[]
+        {
+            new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
+            new Claim(JwtRegisteredClaimNames.Email, user.Email),
+            new Claim(ClaimTypes.Role, user.Role)
+        };
+
+        var token = new JwtSecurityToken(
+            issuer: jwtSection["Issuer"],
+            audience: jwtSection["Audience"],
+            claims: claims,
+            expires: DateTime.UtcNow.AddHours(8),
+            signingCredentials: creds
+        );
+
+        var jwt = new JwtSecurityTokenHandler().WriteToken(token);
+        Console.WriteLine("[LOGIN] JWT generated successfully");
+
+        return Results.Ok(new { token, user = new { user.Id, user.Email, user.Role } });
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[LOGIN ERROR] {ex.Message}");
+        Console.WriteLine($"[LOGIN ERROR] Stack trace: {ex.StackTrace}");
+        return Results.Problem("Internal server error during login");
+    }
 
 });
 
@@ -116,10 +149,10 @@ app.MapPost("/auth/forgot-password", async (ForgotPasswordRequest req, AppDb db)
 {
     var email = req.Email.Trim().ToLowerInvariant();
     var user = await db.Set<AppUser>()
-    .FromSqlRaw("SELECT id, email, password_hash, role FROM app_user WHERE email = @email",
-        new NpgsqlParameter("email", email))
         .AsNoTracking()
-        .SingleOrDefaultAsync();
+        .Where(u => u.Email == email)
+        .Select(u => new AppUser { Id = u.Id, Email = u.Email })
+        .FirstOrDefaultAsync();
 
     if (user is null) return Results.Ok(new { message = "If that email is registered, a reset link has been sent." });
     var token = Guid.NewGuid().ToString("N");
@@ -334,7 +367,7 @@ app.MapPost("/builds", async (
     {
         Id = Guid.NewGuid(),
         BoatId = boat.Id,
-        Selections = JsonSerializer.SerializeToNode(selected),
+        Selections = JsonDocument.Parse(JsonSerializer.Serialize(selected)),
         Subtotal = price.Subtotal,
         Total = price.Total,
         CreatedAt = DateTime.UtcNow
@@ -663,5 +696,94 @@ admin.MapDelete("/options/{id:guid}", async (Guid id, AppDb db) =>
     await db.SaveChangesAsync();
     return Results.NoContent();
 });
+
+// Debug endpoints (only available in development)
+if (app.Environment.IsDevelopment())
+{
+    // Debug endpoint to create test user
+    app.MapPost("/debug/create-admin", async (AppDb db) =>
+    {
+        var email = "admin@example.com";
+        var password = "Password1!";
+
+        // Check if user already exists using only existing columns
+        var existingUser = await db.Set<AppUser>()
+            .AsNoTracking()
+            .Where(u => u.Email == email)
+            .Select(u => new { u.Id, u.Email, u.Role })
+            .FirstOrDefaultAsync();
+
+        if (existingUser != null)
+        {
+            return Results.Ok(new { message = "User already exists", email = existingUser.Email });
+        }
+
+        // Create new admin user using raw SQL to avoid column mapping issues
+        var passwordHash = BCrypt.Net.BCrypt.HashPassword(password);
+        var userId = Guid.NewGuid();
+
+        await db.Database.ExecuteSqlRawAsync(
+            "INSERT INTO app_user (id, email, password_hash, role) VALUES (@id, @email, @passwordHash, @role)",
+            new NpgsqlParameter("id", userId),
+            new NpgsqlParameter("email", email),
+            new NpgsqlParameter("passwordHash", passwordHash),
+            new NpgsqlParameter("role", "admin")
+        );
+
+        return Results.Ok(new { message = "Admin user created", email = email, role = "admin", id = userId });
+    });
+
+    // Debug endpoint to check user
+    app.MapGet("/debug/check-user/{email}", async (string email, AppDb db) =>
+    {
+        var user = await db.Set<AppUser>()
+            .AsNoTracking()
+            .Where(u => u.Email == email.ToLowerInvariant())
+            .Select(u => new { u.Id, u.Email, u.Role, HasPassword = !string.IsNullOrEmpty(u.PasswordHash) })
+            .FirstOrDefaultAsync();
+
+        if (user == null)
+        {
+            return Results.NotFound(new { message = "User not found" });
+        }
+
+        return Results.Ok(user);
+    });
+
+    // Debug endpoint to reset admin password
+    app.MapPost("/debug/reset-admin-password", async (AppDb db) =>
+    {
+        var email = "admin@example.com";
+        var newPassword = "Password1!";
+
+        // Hash the new password
+        var newPasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
+        Console.WriteLine($"[DEBUG] New password hash for verification: {newPasswordHash}");
+
+        // Update the password using raw SQL
+        var rowsAffected = await db.Database.ExecuteSqlRawAsync(
+            "UPDATE app_user SET password_hash = @passwordHash WHERE email = @email",
+            new NpgsqlParameter("passwordHash", newPasswordHash),
+            new NpgsqlParameter("email", email)
+        );
+
+        if (rowsAffected == 0)
+        {
+            return Results.NotFound(new { message = "Admin user not found" });
+        }
+
+        // Verify the hash works
+        var verificationTest = BCrypt.Net.BCrypt.Verify(newPassword, newPasswordHash);
+        Console.WriteLine($"[DEBUG] Password verification test: {verificationTest}");
+
+        return Results.Ok(new
+        {
+            message = "Admin password reset successfully",
+            email = email,
+            hashWorks = verificationTest,
+            rowsAffected = rowsAffected
+        });
+    });
+}
 
 app.Run();

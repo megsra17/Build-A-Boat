@@ -12,7 +12,7 @@ public record RoleUpsert(string Name, string Slug);
 public record SettingDto(string Key, string Value);
 
 // ===== Auth =====
-public record ForgetPasswordRequest(string Email);
+public record ForgotPasswordRequest(string Email);
 public record ResetPasswordRequest(string Token, string NewPassword);
 
 // ===== Users =====
