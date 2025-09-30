@@ -23,7 +23,7 @@ builder.Services.AddSwaggerGen();
 
 // CORS (allow Next.js dev server)
 builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
-    p.WithOrigins("http://localhost:3000").AllowAnyHeader().AllowAnyMethod()));
+    p.WithOrigins("http://localhost:3000", "https://buildaboat-web.up.railway.app").AllowAnyHeader().AllowAnyMethod()));
 
 // Add engines
 builder.Services.AddScoped<PricingEngine>();
