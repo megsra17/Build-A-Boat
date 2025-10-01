@@ -181,7 +181,8 @@ app.MapPost("/setup/admin", async (AppDb db) =>
         db.Set<AppUser>().Add(adminUser);
         await db.SaveChangesAsync();
 
-        return Results.Ok(new { 
+        return Results.Ok(new
+        {
             message = "Admin user created successfully",
             email = "admin@example.com",
             password = "admin123"
@@ -195,14 +196,22 @@ app.MapPost("/setup/admin", async (AppDb db) =>
 });
 
 // Debug endpoint to check configuration
-app.MapGet("/debug/config", () => Results.Ok(new
+app.MapGet("/debug/config", () =>
 {
-    hasJwtSecret = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("JWT_SECRET")),
-    jwtIssuer = Environment.GetEnvironmentVariable("JWT_ISSUER"),
-    jwtAudience = Environment.GetEnvironmentVariable("JWT_AUDIENCE"),
-    hasDatabaseUrl = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DATABASE_URL")),
-    environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Development"
-}));
+    var dbUrl = Environment.GetEnvironmentVariable("DATABASE_URL");
+    var dbUrlPreview = string.IsNullOrEmpty(dbUrl) ? "null" :
+        dbUrl.Length > 30 ? $"{dbUrl.Substring(0, 30)}...{dbUrl.Substring(dbUrl.Length - 15)}" : dbUrl;
+
+    return Results.Ok(new
+    {
+        hasJwtSecret = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("JWT_SECRET")),
+        jwtIssuer = Environment.GetEnvironmentVariable("JWT_ISSUER"),
+        jwtAudience = Environment.GetEnvironmentVariable("JWT_AUDIENCE"),
+        hasDatabaseUrl = !string.IsNullOrEmpty(dbUrl),
+        databaseUrlPreview = dbUrlPreview,
+        environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Development"
+    });
+});
 
 // Database test endpoint
 app.MapGet("/debug/db-test", async (AppDb db) =>
@@ -210,19 +219,21 @@ app.MapGet("/debug/db-test", async (AppDb db) =>
     try
     {
         await db.Database.CanConnectAsync();
-        
+
         // Try to count users
         var userCount = await db.Set<AppUser>().CountAsync();
-        
-        return Results.Ok(new { 
+
+        return Results.Ok(new
+        {
             status = "Database connection successful",
             userCount = userCount
         });
     }
     catch (Exception ex)
     {
-        return Results.Ok(new { 
-            status = "Database operation failed", 
+        return Results.Ok(new
+        {
+            status = "Database operation failed",
             error = ex.Message,
             stackTrace = ex.StackTrace?.Substring(0, 500)
         });
