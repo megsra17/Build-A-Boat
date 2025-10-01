@@ -10,8 +10,15 @@ using System.Security.Claims;
 using System.IdentityModel.Tokens.Jwt;
 using BCrypt.Net;
 using Microsoft.AspNetCore.Identity.Data;
+using DotNetEnv;
 
 var builder = WebApplication.CreateBuilder(args);
+
+//load .env in development
+if (builder.Environment.IsDevelopment())
+{
+    Env.Load();
+}
 
 // EF Core + Postgres
 builder.Services.AddDbContext<AppDb>(opt =>
