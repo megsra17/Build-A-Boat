@@ -427,7 +427,16 @@ app.MapPost("/auth/login", async (LoginRequest req, AppDb db) =>
 
         return Results.Ok(new { 
             token = jwt, 
-            user = new { user.Id, user.Email, user.Role } 
+            user = new { 
+                user.Id, 
+                user.Email, 
+                user.Role,
+                user.Username,
+                user.FirstName,
+                user.LastName,
+                user.Timezone,
+                user.AvatarUrl
+            } 
         });
     }
     catch (Exception ex)
