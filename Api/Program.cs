@@ -226,8 +226,7 @@ app.MapPost("/auth/login", async (LoginRequest req, AppDb db) =>
         Console.WriteLine("[LOGIN] Password verified successfully, generating JWT...");
 
         //build JWT
-        var jwtSection = app.Configuration.GetSection("Jwt");
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSection["Secret"]!));
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
         var claims = new[]
         {
