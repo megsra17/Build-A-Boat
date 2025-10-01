@@ -172,7 +172,7 @@ export default function NewUserPage() {
           <div className="relative">
             <label className="text-sm text-white/70">Re-Enter Password</label>
             <input
-              type={showPassword ? "text" : "password"}
+              type={showConfirmPassword ? "text" : "password"}
               value={confirmPassword}
               onChange={e=>setConfirmPassword(e.target.value)}
               className="w-full bg-transparent border-b border-white/20 focus:border-white/40 outline-none py-2 pr-8"
