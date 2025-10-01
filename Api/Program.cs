@@ -204,6 +204,20 @@ app.MapGet("/debug/config", () => Results.Ok(new
     environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Development"
 }));
 
+// Database test endpoint
+app.MapGet("/debug/db-test", async (AppDb db) =>
+{
+    try
+    {
+        await db.Database.CanConnectAsync();
+        return Results.Ok(new { status = "Database connection successful" });
+    }
+    catch (Exception ex)
+    {
+        return Results.Ok(new { status = "Database connection failed", error = ex.Message });
+    }
+});
+
 var port = Environment.GetEnvironmentVariable("PORT") ?? "5000";
 Console.WriteLine($"Starting server on port: {port}");
 app.Urls.Add($"http://0.0.0.0:{port}");
