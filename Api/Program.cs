@@ -42,8 +42,22 @@ builder.Services.AddDbContext<AppDb>(opt =>
         try
         {
             var uri = new Uri(connectionString);
-            connectionString = $"Host={uri.Host};Port={uri.Port};Database={uri.LocalPath.TrimStart('/')};Username={uri.UserInfo.Split(':')[0]};Password={uri.UserInfo.Split(':')[1]}";
-            Console.WriteLine($"Converted connection string: {connectionString}");
+            var host = uri.Host;
+            var port = uri.Port;
+            var database = uri.LocalPath.TrimStart('/');
+            var username = uri.UserInfo.Split(':')[0];
+            var password = uri.UserInfo.Split(':')[1];
+
+            // Set individual PostgreSQL environment variables that Railway expects
+            Environment.SetEnvironmentVariable("PGHOST", host);
+            Environment.SetEnvironmentVariable("PGPORT", port.ToString());
+            Environment.SetEnvironmentVariable("PGDATABASE", database);
+            Environment.SetEnvironmentVariable("PGUSER", username);
+            Environment.SetEnvironmentVariable("PGPASSWORD", password);
+
+            connectionString = $"Host={host};Port={port};Database={database};Username={username};Password={password}";
+            Console.WriteLine($"Converted connection string: Host={host};Port={port};Database={database};Username={username};Password=***");
+            Console.WriteLine($"Set PGHOST={host}, PGPORT={port}, PGDATABASE={database}, PGUSER={username}");
         }
         catch (Exception ex)
         {
@@ -225,6 +239,11 @@ app.MapGet("/debug/config", () =>
         jwtAudience = Environment.GetEnvironmentVariable("JWT_AUDIENCE"),
         hasDatabaseUrl = !string.IsNullOrEmpty(dbUrl),
         databaseUrlPreview = dbUrlPreview,
+        pgHost = Environment.GetEnvironmentVariable("PGHOST"),
+        pgPort = Environment.GetEnvironmentVariable("PGPORT"),
+        pgDatabase = Environment.GetEnvironmentVariable("PGDATABASE"),
+        pgUser = Environment.GetEnvironmentVariable("PGUSER"),
+        hasPgPassword = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("PGPASSWORD")),
         environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Development"
     });
 });
