@@ -329,9 +329,24 @@ app.MapPost("/auth/login", async (LoginRequest req, AppDb db) =>
 {
     try
     {
+        Console.WriteLine($"[LOGIN] Login attempt started");
+        Console.WriteLine($"[LOGIN] Request received - Email: {req?.Email ?? "null"}");
+
+        if (req == null)
+        {
+            Console.WriteLine("[LOGIN] Request is null");
+            return Results.BadRequest(new { message = "Invalid request" });
+        }
+
         //find user by email
-        var email = req.Email.Trim().ToLowerInvariant();
+        var email = req.Email?.Trim()?.ToLowerInvariant();
         Console.WriteLine($"[LOGIN] Looking for user with email: {email}");
+
+        if (string.IsNullOrEmpty(email))
+        {
+            Console.WriteLine("[LOGIN] Email is null or empty");
+            return Results.BadRequest(new { message = "Email is required" });
+        }
 
         //find user using EF but only select essential columns
         var user = await db.Set<AppUser>()
@@ -354,6 +369,12 @@ app.MapPost("/auth/login", async (LoginRequest req, AppDb db) =>
 
         Console.WriteLine($"[LOGIN] User found: {user.Email}, Role: {user.Role}");
         Console.WriteLine($"[LOGIN] Password hash exists: {!string.IsNullOrEmpty(user.PasswordHash)}");
+
+        if (string.IsNullOrEmpty(req.Password))
+        {
+            Console.WriteLine("[LOGIN] Password is null or empty");
+            return Results.BadRequest(new { message = "Password is required" });
+        }
 
         //verify password
         var passwordValid = BCrypt.Net.BCrypt.Verify(req.Password, user.PasswordHash);
