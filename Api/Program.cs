@@ -197,31 +197,41 @@ app.MapPost("/setup/admin", async (AppDb db) =>
             return Results.BadRequest(new { message = "Users already exist. Setup not needed." });
         }
 
-        // Create first admin user
-        var adminUser = new AppUser
-        {
-            Id = Guid.NewGuid(),
-            Email = "admin@example.com",
-            Role = "admin",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword("admin123"),
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow
-        };
+        // Create first admin user using raw SQL to ensure proper insertion
+        var userId = Guid.NewGuid();
+        var email = "admin@example.com";
+        var password = "admin123";
+        var passwordHash = BCrypt.Net.BCrypt.HashPassword(password);
+        var now = DateTime.UtcNow;
 
-        db.Set<AppUser>().Add(adminUser);
-        await db.SaveChangesAsync();
+        Console.WriteLine($"[SETUP] Creating admin user with email: {email}");
+        Console.WriteLine($"[SETUP] Password hash created: {!string.IsNullOrEmpty(passwordHash)}");
+
+        await db.Database.ExecuteSqlRawAsync(
+            "INSERT INTO app_user (id, email, password_hash, role, created_at, updated_at) VALUES (@id, @email, @passwordHash, @role, @createdAt, @updatedAt)",
+            new NpgsqlParameter("id", userId),
+            new NpgsqlParameter("email", email),
+            new NpgsqlParameter("passwordHash", passwordHash),
+            new NpgsqlParameter("role", "admin"),
+            new NpgsqlParameter("createdAt", now),
+            new NpgsqlParameter("updatedAt", now)
+        );
+
+        Console.WriteLine($"[SETUP] Admin user created successfully with ID: {userId}");
 
         return Results.Ok(new
         {
             message = "Admin user created successfully",
-            email = "admin@example.com",
-            password = "admin123"
+            email = email,
+            password = password,
+            id = userId
         });
     }
     catch (Exception ex)
     {
         Console.WriteLine($"Setup error: {ex.Message}");
-        return Results.Problem("Failed to create admin user");
+        Console.WriteLine($"Setup stack trace: {ex.StackTrace}");
+        return Results.Problem($"Failed to create admin user: {ex.Message}");
     }
 });
 
@@ -271,6 +281,28 @@ app.MapGet("/debug/db-test", async (AppDb db) =>
             status = "Database operation failed",
             error = ex.Message,
             stackTrace = ex.StackTrace?.Substring(0, 500)
+        });
+    }
+});
+
+// User check endpoint that works in production
+app.MapGet("/debug/users", async (AppDb db) =>
+{
+    try
+    {
+        var users = await db.Set<AppUser>()
+            .AsNoTracking()
+            .Select(u => new { u.Id, u.Email, u.Role, HasPassword = !string.IsNullOrEmpty(u.PasswordHash) })
+            .ToListAsync();
+
+        return Results.Ok(new { users = users, count = users.Count });
+    }
+    catch (Exception ex)
+    {
+        return Results.Ok(new
+        {
+            status = "Error fetching users",
+            error = ex.Message
         });
     }
 });
