@@ -17,9 +17,6 @@ const getApiBase = () => {
 const API = getApiBase();
 const DEV_BYPASS = process.env.NEXT_PUBLIC_DEV_AUTH_BYPASS === "1";
 
-console.log("Login page - API URL:", API);
-console.log("Login page - Environment:", process.env.NODE_ENV);
-
 export default function AdminLoginPage() {
   const r = useRouter();
   const sp = useSearchParams();
@@ -37,18 +34,12 @@ export default function AdminLoginPage() {
     setErr(null);
     setBusy(true);
     
-    console.log("Login attempt - API URL:", API);
-    console.log("Login attempt - Full URL:", `${API}/auth/login`);
-    
     try {
       const res = await fetch(`${API}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
-      
-      console.log("Login response status:", res.status);
-      console.log("Login response headers:", Object.fromEntries(res.headers.entries()));
       
       if (!res.ok) {
         const text = await res.text();
@@ -64,7 +55,6 @@ export default function AdminLoginPage() {
       }
       
       const data = await res.json();
-      console.log("Login successful:", data);
 
       if (remember) localStorage.setItem("jwt", data.token);
       else sessionStorage.setItem("jwt", data.token);

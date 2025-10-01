@@ -6,11 +6,6 @@ const getApiBase = () => {
     const envUrl = process.env.NEXT_PUBLIC_API_BASE || process.env.NEXT_PUBLIC_API_URL;
     const railwayUrl = 'https://build-a-boat-production.up.railway.app';
     
-    console.log("Production environment detected");
-    console.log("NEXT_PUBLIC_API_BASE:", process.env.NEXT_PUBLIC_API_BASE);
-    console.log("NEXT_PUBLIC_API_URL:", process.env.NEXT_PUBLIC_API_URL);
-    console.log("Using URL:", envUrl || railwayUrl);
-    
     return envUrl || railwayUrl;
   }
   
@@ -23,12 +18,8 @@ let API = getApiBase();
 // Safety check to ensure API is never undefined
 if (!API || API === 'undefined') {
   const fallbackUrl = 'https://build-a-boat-production.up.railway.app';
-  console.error("API URL is undefined or invalid, using fallback:", fallbackUrl);
   API = fallbackUrl;
 }
-
-console.log("Final API base URL:", API);
-console.log("Environment:", process.env.NODE_ENV);
 
 import { authFetch } from "../lib/auth-client";
 

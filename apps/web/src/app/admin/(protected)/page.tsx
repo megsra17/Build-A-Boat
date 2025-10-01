@@ -9,10 +9,6 @@ const getApiBase = () => {
     const envUrl = process.env.NEXT_PUBLIC_API_BASE || process.env.NEXT_PUBLIC_API_URL;
     const railwayUrl = 'https://build-a-boat-production.up.railway.app';
     
-    console.log("Dashboard - Production environment detected");
-    console.log("Dashboard - NEXT_PUBLIC_API_BASE:", process.env.NEXT_PUBLIC_API_BASE);
-    console.log("Dashboard - Using URL:", envUrl || railwayUrl);
-    
     return envUrl || railwayUrl;
   }
   
@@ -29,17 +25,12 @@ export default function AdminHome() {
     try{
       const token = localStorage.getItem("jwt");
       
-      console.log("Dashboard - API URL:", API);
-      console.log("Dashboard - Token exists:", !!token);
-      console.log("Dashboard - Token length:", token?.length || 0);
-      
       if (!token) {
         console.error("No authentication token found");
         return;
       }
 
       const url = `${API}/admin/users/count`;
-      console.log("Dashboard - Calling URL:", url);
 
       const res = await fetch(url, {
         headers: {
@@ -48,9 +39,6 @@ export default function AdminHome() {
         }
       });
       
-      console.log("Dashboard - Response status:", res.status);
-      console.log("Dashboard - Response headers:", Object.fromEntries(res.headers.entries()));
-      
       if(!res.ok) {
         const errorText = await res.text();
         console.error("API Error:", errorText);
@@ -58,7 +46,6 @@ export default function AdminHome() {
       }
       
       const data = await res.json();
-      console.log("Dashboard - User count data:", data);
       setUserCount(data.count);
     }
     catch(err){
