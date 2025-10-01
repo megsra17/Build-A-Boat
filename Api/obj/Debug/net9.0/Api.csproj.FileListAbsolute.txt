@@ -116,3 +116,5 @@
 /Users/meganrakow/Desktop/Build-A-Boat/Api/obj/Debug/net9.0/Api.pdb
 /Users/meganrakow/Desktop/Build-A-Boat/Api/obj/Debug/net9.0/Api.genruntimeconfig.cache
 /Users/meganrakow/Desktop/Build-A-Boat/Api/obj/Debug/net9.0/ref/Api.dll
+/Users/meganrakow/Desktop/Build-A-Boat/Api/bin/Debug/net9.0/DotNetEnv.dll
+/Users/meganrakow/Desktop/Build-A-Boat/Api/bin/Debug/net9.0/Sprache.dll

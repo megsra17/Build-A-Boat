@@ -1,4 +1,5 @@
-const API = process.env.NEXT_PUBLIC_API_BASE;
+const API = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5199";
+console.log("API base URL:", API); // Add this line to debug
 
 import { authFetch } from "../lib/auth-client";
 
@@ -11,7 +12,7 @@ export type Role = { id: string; name: string; slug: string; };
 async function j<T>(r: Response){ if(!r.ok) throw new Error(await r.text()); return r.json() as Promise<T>; }
 
 function authHeaders(): Record<string, string> {
-  const t = typeof window !== "undefined" ? localStorage.getItem("admin_token") : null;
+  const t = typeof window !== "undefined" ? localStorage.getItem("jwt") : null;
   return t ? {Authorization: `Bearer ${t}`} : {};
 }
 
@@ -20,8 +21,8 @@ export type UserRow = {
   email: string;
   role: string;
   username?: string;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export const SettingsApi = {
@@ -100,31 +101,31 @@ export const RolesApi = {
 export const BoatsApi = {
   list: (search?: string) => {
     const qs = search ? `?search=${encodeURIComponent(search)}` : "";
-    return authFetch(`${API}/api/admin/boats${qs}`, { cache:"no-store" })
+    return authFetch(`${API}/admin/boats${qs}`, { cache:"no-store" })
       .then(j<{items:Boat[]}>);
   },
   create: (b: {slug:string; name:string; basePrice:number; modelYear?:number|null}) =>
-    authFetch(`${API}/api/admin/boats`, {
+    authFetch(`${API}/admin/boats`, {
       method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify(b)
     }).then(j<Boat>),
   update: (id:string, b: Partial<Pick<Boat,"slug"|"name"|"basePrice"|"modelYear"|"heroImageUrl">>) =>
-    authFetch(`${API}/api/admin/boats/${id}`, {
+    authFetch(`${API}/admin/boats/${id}`, {
       method:"PATCH",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify(b)
     }).then(j<Boat>),
   remove: (id:string) =>
-    authFetch(`${API}/api/admin/boats/${id}`, { method:"DELETE" })
+    authFetch(`${API}/admin/boats/${id}`, { method:"DELETE" })
       .then(async r => { if(!r.ok) throw new Error(await r.text()); }),
 
   toggleActive: (id:string) =>
-    authFetch(`${API}/api/admin/boats/${id}/toggle-active`, { method:"POST" })
+    authFetch(`${API}/admin/boats/${id}/toggle-active`, { method:"POST" })
       .then(j<{id:string; isActive:boolean}>),
 
   duplicate: (id:string, body:{ newSlug:string; newName?:string; newModelYear?:number }) =>
-    authFetch(`${API}/api/admin/boats/${id}/duplicate`, {
+    authFetch(`${API}/admin/boats/${id}/duplicate`, {
       method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify(body)

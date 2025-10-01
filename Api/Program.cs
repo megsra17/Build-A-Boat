@@ -22,7 +22,13 @@ if (builder.Environment.IsDevelopment())
 
 // EF Core + Postgres
 builder.Services.AddDbContext<AppDb>(opt =>
-    opt.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
+{
+    var connectionString = Environment.GetEnvironmentVariable("DATABASE_URL")
+        ?? builder.Configuration.GetConnectionString("Default");
+
+    Console.WriteLine($"Connection string: {connectionString}");
+    opt.UseNpgsql(connectionString);
+});
 
 // Swagger
 builder.Services.AddEndpointsApiExplorer();
@@ -140,7 +146,7 @@ app.MapPost("/auth/login", async (LoginRequest req, AppDb db) =>
         var jwt = new JwtSecurityTokenHandler().WriteToken(token);
         Console.WriteLine("[LOGIN] JWT generated successfully");
 
-        return Results.Ok(new { token, user = new { user.Id, user.Email, user.Role } });
+        return Results.Ok(new { token = jwt, user = new { user.Id, user.Email, user.Role } });
     }
     catch (Exception ex)
     {
@@ -300,28 +306,31 @@ admin.MapPut("/settings/{key}", async (string key, SettingDto dto, AppDb db) =>
 });
 
 //get timezones
-admin.MapGet("/settings/timezones", async (AppDb db) =>
+admin.MapGet("/settings/timezone", async (AppDb db) =>
 {
-    var tz = await db.Settings.AsNoTracking().Where(s => s.key == "system.timezones").Select(s => s.value).FirstOrDefaultAsync();
-    return Results.Ok(new { value = tz ?? "UTC" });
+    var setting = await db.Settings
+        .Where(s => s.key == "system.timezone")
+        .Select(s => s.value)
+        .FirstOrDefaultAsync();
+
+    return Results.Ok(new { value = setting ?? "UTC" });
 });
 
 //set timezones
-admin.MapPut("settings/timezones", async (SettingDto dto, AppDb db) =>
+admin.MapPut("/settings/system/timezone", async (SettingDto dto, AppDb db) =>
 {
-    var s = await db.Settings.FindAsync("system.timezones");
-    if (s is null)
+    var setting = await db.Settings.FirstOrDefaultAsync(s => s.key == dto.Key);
+    if (setting == null)
     {
-        s = new AppSettings { key = "system.timezones", value = dto.Value, updatedAt = DateTime.UtcNow };
-        db.Settings.Add(s);
+        setting = new AppSettings { key = dto.Key, value = dto.Value };
+        db.Settings.Add(setting);
     }
     else
     {
-        s.value = dto.Value;
-        s.updatedAt = DateTime.UtcNow;
+        setting.value = dto.Value;
     }
     await db.SaveChangesAsync();
-    return Results.Ok(new SettingDto(s.key, s.value));
+    return Results.Ok(new { value = setting.value });
 });
 
 //Boat config 
@@ -394,17 +403,17 @@ app.MapPost("/builds", async (
 //Users
 admin.MapGet("/users/count", async (AppDb db) =>
 {
-    var count = await db.Set<AppUser>().CountAsync(u => u.IsActive);
+    var count = await db.Set<AppUser>().CountAsync();
     return Results.Ok(new { count });
 });
+
 
 //User list with paging
 admin.MapGet("/users", async (HttpRequest http, AppDb db) =>
 {
-    //query params
     var q = http.Query;
     var search = q["search"].ToString()?.Trim();
-    int page = int.TryParse(q["page"], out var p) ? Math.Max(1, p) : p;
+    int page = int.TryParse(q["page"], out var p) ? Math.Max(1, p) : 1;
     int pageSize = int.TryParse(q["pageSize"], out var s) ? Math.Clamp(s, 1, 100) : 25;
 
     var qry = db.Set<AppUser>().AsNoTracking();
@@ -412,7 +421,7 @@ admin.MapGet("/users", async (HttpRequest http, AppDb db) =>
     if (!string.IsNullOrEmpty(search))
     {
         var sterm = search.ToLower();
-        qry = qry.Where(u => u.Email.ToLower().Contains(sterm) || (u.Username != null && u.Username.ToLower().Contains(sterm)));
+        qry = qry.Where(u => u.Email.ToLower().Contains(sterm));
     }
 
     var total = await qry.CountAsync();
@@ -421,7 +430,15 @@ admin.MapGet("/users", async (HttpRequest http, AppDb db) =>
         .OrderBy(u => u.Email)
         .Skip((page - 1) * pageSize)
         .Take(pageSize)
-        .Select(u => new UserListItem(u.Id, u.Email, u.Username, u.Role, u.CreatedAt, u.UpdatedAt))
+        .Select(u => new
+        {
+            id = u.Id,
+            email = u.Email,
+            username = (string?)null,
+            role = u.Role,
+            createdAt = u.CreatedAt,
+            updatedAt = u.CreatedAt
+        })
         .ToListAsync();
 
     return Results.Ok(new { total, page, pageSize, items });

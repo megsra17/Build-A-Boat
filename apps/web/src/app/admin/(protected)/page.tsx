@@ -11,18 +11,32 @@ export default function AdminHome() {
   useEffect(() =>{
   async function load() {
     try{
-      const token = localStorage.getItem("token");
-      const res = await fetch(`${API}//users/count`, {
+      const token = localStorage.getItem("jwt");
+      
+      
+      if (!token) {
+        console.error("No authentication token found");
+        return;
+      }
+
+      const res = await fetch(`${API}/admin/users/count`, {
         headers: {
-          Authorization: `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
         }
       });
-      if(!res.ok) throw new Error("Failed to fetch user count");
+      
+      if(!res.ok) {
+        const errorText = await res.text();
+        console.error("API Error:", errorText);
+        throw new Error(`Failed to fetch user count: ${res.status}`);
+      }
+      
       const data = await res.json();
       setUserCount(data.count);
     }
     catch(err){
-      console.error(err);
+      console.error("Load error:", err);
     }
   }
   load();

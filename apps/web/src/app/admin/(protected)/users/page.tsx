@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { UsersApi, UserRow } from "../../../lib/admin-api";
 import { Search, X, Plus } from "lucide-react";
 import Link from "next/link";
@@ -30,7 +30,7 @@ export default function UsersPage() {
     const [page, setPage] = useState(1);
     const pageSize = 25;
 
-    async function load(){
+    const load = useCallback(async () => {
         setBusy(true);
         try{
             const res = await UsersApi.list({ search, page, pageSize }) as { items: UserRow[], total: number };
@@ -41,18 +41,18 @@ export default function UsersPage() {
         } finally {
             setBusy(false);
         }
-    }
+    }, [search, page, pageSize]);
 
     useEffect(() =>{
         load();
-    }, [page]);
+    }, [page, load]);
     useEffect(() =>{
         const t = setTimeout(() => {
             setPage(1);
             load();
         }, 500);
         return () => clearTimeout(t);
-    }, [search]);
+    }, [search, load]);
 
     const pages = Math.max(1, Math.ceil(total / pageSize));
 
@@ -118,8 +118,8 @@ export default function UsersPage() {
                   <td className="px-4 py-3 font-mono text-white/80">{u.username ?? ""}</td>
                   <td className="px-4 py-3">{u.email}</td>
                   <td className="px-4 py-3">{u.role}</td>
-                  <td className="px-4 py-3">{formatDate(u.createdAt.toISOString())}</td>
-                  <td className="px-2 py-3">{formatDate(u.updatedAt.toISOString())}</td>
+                  <td className="px-4 py-3">{formatDate(u.createdAt)}</td>
+                  <td className="px-2 py-3">{formatDate(u.updatedAt)}</td>
                   <td className="px-2 py-3 text-right">
                     <button
                       onClick={() => deleteUser(u.id)}

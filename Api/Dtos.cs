@@ -17,12 +17,14 @@ public record ResetPasswordRequest(string Token, string NewPassword);
 
 // ===== Users =====
 public record UserListRequest(string? Search, int Page = 1, int PageSize = 25);
-public record UserListItem(Guid Id, string Email, string? Username, string Role, DateTime CreatedAt, DateTime UpdatedAt);
-public record UpsertUser(string Email,
+public record UserListItem(Guid Id, string Email, string? Username, string Role, DateTime CreatedAt);
+public record UpsertUser(
+    string Email,
     string? Username,
-    string Role,
+    string? Role,
     string? Password,
     string? FirstName,
     string? LastName,
     string? Timezone,
-    string? AvatarUrl);
+    string? AvatarUrl
+);

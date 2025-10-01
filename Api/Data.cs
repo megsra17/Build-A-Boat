@@ -49,8 +49,21 @@ public class AppDb : DbContext
         b.Entity<AppUser>().Property(x => x.Email).HasColumnName("email");
         b.Entity<AppUser>().Property(x => x.PasswordHash).HasColumnName("password_hash");
         b.Entity<AppUser>().Property(x => x.Role).HasColumnName("role");
+        b.Entity<AppUser>().Property(x => x.Username).HasColumnName("username");
+        b.Entity<AppUser>().Property(x => x.FirstName).HasColumnName("first_name");
+        b.Entity<AppUser>().Property(x => x.LastName).HasColumnName("last_name");
+        b.Entity<AppUser>().Property(x => x.Timezone).HasColumnName("timezone");
+        b.Entity<AppUser>().Property(x => x.AvatarUrl).HasColumnName("avatar_url");
+        b.Entity<AppUser>().Property(x => x.CreatedAt).HasColumnName("created_at");
+        b.Entity<AppUser>().Property(x => x.UpdatedAt).HasColumnName("updated_at");
+        b.Entity<AppUser>().Property(x => x.IsActive).HasColumnName("is_active");
 
         b.Entity<AppRole>().ToTable("app_role");
+        b.Entity<AppRole>().Property(x => x.Id).HasColumnName("id");
+        b.Entity<AppRole>().Property(x => x.Name).HasColumnName("name");
+        b.Entity<AppRole>().Property(x => x.Slug).HasColumnName("slug");
+        b.Entity<AppRole>().Property(x => x.CreatedAt).HasColumnName("created_at");
+        b.Entity<AppRole>().Property(x => x.UpdatedAt).HasColumnName("updated_at");
         b.Entity<AppRole>().HasIndex(x => x.Slug).IsUnique();
 
         b.Entity<AppSettings>().ToTable("app_settings");
@@ -58,6 +71,13 @@ public class AppDb : DbContext
         b.Entity<AppSettings>().Property(x => x.updatedAt).HasColumnName("updated_at");
 
         b.Entity<Boat>().ToTable("boat");
+        b.Entity<Boat>().Property(x => x.Id).HasColumnName("id");
+        b.Entity<Boat>().Property(x => x.Slug).HasColumnName("slug");
+        b.Entity<Boat>().Property(x => x.Name).HasColumnName("name");
+        b.Entity<Boat>().Property(x => x.BasePrice).HasColumnName("base_price");
+        b.Entity<Boat>().Property(x => x.IsActive).HasColumnName("is_active");
+        b.Entity<Boat>().Property(x => x.ModelYear).HasColumnName("model_year");
+        b.Entity<Boat>().Property(x => x.HeroImageUrl).HasColumnName("hero_image_url");
         b.Entity<Category>().ToTable("category");
         b.Entity<OptionGroup>().ToTable("option_group");
         b.Entity<Option>().ToTable("option"); // quoted table in SQL; EF will quote it
