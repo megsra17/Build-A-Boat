@@ -34,9 +34,25 @@ builder.Services.AddDbContext<AppDb>(opt =>
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// CORS (allow Next.js dev server)
+// CORS (allow Next.js dev server and Vercel deployment)
 builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
-    p.WithOrigins("http://localhost:3000", "https://buildaboat-web.up.railway.app").AllowAnyHeader().AllowAnyMethod()));
+{
+    var origins = new List<string>
+    {
+        "http://localhost:3000",
+        "https://buildaboat-web.up.railway.app",
+        "https://build-a-boat.vercel.app"
+    };
+
+    // Add any Vercel preview URLs
+    var vercelUrl = Environment.GetEnvironmentVariable("VERCEL_URL");
+    if (!string.IsNullOrEmpty(vercelUrl))
+    {
+        origins.Add($"https://{vercelUrl}");
+    }
+
+    p.WithOrigins(origins.ToArray()).AllowAnyHeader().AllowAnyMethod();
+}));
 
 // Add engines
 builder.Services.AddScoped<PricingEngine>();
@@ -44,7 +60,9 @@ builder.Services.AddScoped<ConstraintEngine>();
 
 //Auth
 var jwtSection = builder.Configuration.GetSection("Jwt");
-var jwtSecret = jwtSection["Secret"]!;
+var jwtSecret = Environment.GetEnvironmentVariable("JWT_SECRET") ?? jwtSection["Secret"]!;
+var jwtIssuer = Environment.GetEnvironmentVariable("JWT_ISSUER") ?? jwtSection["Issuer"]!;
+var jwtAudience = Environment.GetEnvironmentVariable("JWT_AUDIENCE") ?? jwtSection["Audience"]!;
 var jwtKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret));
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -56,8 +74,8 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateAudience = true,
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
-            ValidIssuer = jwtSection["Issuer"],
-            ValidAudience = jwtSection["Audience"],
+            ValidIssuer = jwtIssuer,
+            ValidAudience = jwtAudience,
             IssuerSigningKey = jwtKey
         };
     });
@@ -136,8 +154,8 @@ app.MapPost("/auth/login", async (LoginRequest req, AppDb db) =>
         };
 
         var token = new JwtSecurityToken(
-            issuer: jwtSection["Issuer"],
-            audience: jwtSection["Audience"],
+            issuer: jwtIssuer,
+            audience: jwtAudience,
             claims: claims,
             expires: DateTime.UtcNow.AddHours(8),
             signingCredentials: creds

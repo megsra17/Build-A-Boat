@@ -1,5 +1,20 @@
-const API = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5199";
-console.log("API base URL:", API); // Add this line to debug
+// Determine API base URL with fallbacks for different environments
+const getApiBase = () => {
+  // For production, try multiple potential API URLs
+  if (process.env.NODE_ENV === 'production') {
+    return process.env.NEXT_PUBLIC_API_BASE || 
+           process.env.NEXT_PUBLIC_API_URL ||
+           'https://frontend-production-e47e.up.railway.app'; // TODO: Replace with your actual Railway domain
+  }
+  
+  // For development
+  return process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5199";
+};
+
+const API = getApiBase();
+console.log("API base URL:", API);
+console.log("Environment:", process.env.NODE_ENV);
+console.log("NEXT_PUBLIC_API_BASE:", process.env.NEXT_PUBLIC_API_BASE);
 
 import { authFetch } from "../lib/auth-client";
 
@@ -9,7 +24,23 @@ export type OptionGroup = { id: string; categoryId: string; name: string; select
 export type OptionItem = { id: string; optionGroupId: string; sku?: string|null; label: string; description?: string|null; priceDelta: number; imageUrl?: string|null; isDefault: boolean; isActive: boolean; sortOrder: number; };
 export type Role = { id: string; name: string; slug: string; };
 
-async function j<T>(r: Response){ if(!r.ok) throw new Error(await r.text()); return r.json() as Promise<T>; }
+async function j<T>(r: Response): Promise<T> { 
+  console.log("Response status:", r.status, "URL:", r.url);
+  if (!r.ok) {
+    const text = await r.text();
+    console.error("API Error Response:", text);
+    throw new Error(`API Error ${r.status}: ${text.substring(0, 200)}...`);
+  }
+  
+  const contentType = r.headers.get("content-type");
+  if (!contentType || !contentType.includes("application/json")) {
+    const text = await r.text();
+    console.error("Non-JSON response:", text.substring(0, 200));
+    throw new Error(`Expected JSON but got: ${contentType}. Response: ${text.substring(0, 100)}...`);
+  }
+  
+  return r.json() as Promise<T>; 
+}
 
 function authHeaders(): Record<string, string> {
   const t = typeof window !== "undefined" ? localStorage.getItem("jwt") : null;
