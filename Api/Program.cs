@@ -178,6 +178,16 @@ app.MapGet("/", () => Results.Ok(new
 
 app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
 
+// Debug endpoint to check configuration
+app.MapGet("/debug/config", () => Results.Ok(new
+{
+    hasJwtSecret = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("JWT_SECRET")),
+    jwtIssuer = Environment.GetEnvironmentVariable("JWT_ISSUER"),
+    jwtAudience = Environment.GetEnvironmentVariable("JWT_AUDIENCE"),
+    hasDatabaseUrl = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DATABASE_URL")),
+    environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Development"
+}));
+
 var port = Environment.GetEnvironmentVariable("PORT") ?? "5000";
 Console.WriteLine($"Starting server on port: {port}");
 app.Urls.Add($"http://0.0.0.0:{port}");
