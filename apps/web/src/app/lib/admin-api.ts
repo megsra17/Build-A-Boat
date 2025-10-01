@@ -1,20 +1,34 @@
 // Determine API base URL with fallbacks for different environments
 const getApiBase = () => {
-  // For production, try multiple potential API URLs
+  // Always prioritize the Railway URL for production, since Vercel env vars might not be set
   if (process.env.NODE_ENV === 'production') {
-    return process.env.NEXT_PUBLIC_API_BASE || 
-           process.env.NEXT_PUBLIC_API_URL ||
-           'https://build-a-boat-production.up.railway.app'; // Your actual Railway API domain
+    // Try environment variables first, but always fall back to Railway
+    const envUrl = process.env.NEXT_PUBLIC_API_BASE || process.env.NEXT_PUBLIC_API_URL;
+    const railwayUrl = 'https://build-a-boat-production.up.railway.app';
+    
+    console.log("Production environment detected");
+    console.log("NEXT_PUBLIC_API_BASE:", process.env.NEXT_PUBLIC_API_BASE);
+    console.log("NEXT_PUBLIC_API_URL:", process.env.NEXT_PUBLIC_API_URL);
+    console.log("Using URL:", envUrl || railwayUrl);
+    
+    return envUrl || railwayUrl;
   }
   
   // For development
   return process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5199";
 };
 
-const API = getApiBase();
-console.log("API base URL:", API);
+let API = getApiBase();
+
+// Safety check to ensure API is never undefined
+if (!API || API === 'undefined') {
+  const fallbackUrl = 'https://build-a-boat-production.up.railway.app';
+  console.error("API URL is undefined or invalid, using fallback:", fallbackUrl);
+  API = fallbackUrl;
+}
+
+console.log("Final API base URL:", API);
 console.log("Environment:", process.env.NODE_ENV);
-console.log("NEXT_PUBLIC_API_BASE:", process.env.NEXT_PUBLIC_API_BASE);
 
 import { authFetch } from "../lib/auth-client";
 
