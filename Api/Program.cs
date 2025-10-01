@@ -210,11 +210,22 @@ app.MapGet("/debug/db-test", async (AppDb db) =>
     try
     {
         await db.Database.CanConnectAsync();
-        return Results.Ok(new { status = "Database connection successful" });
+        
+        // Try to count users
+        var userCount = await db.Set<AppUser>().CountAsync();
+        
+        return Results.Ok(new { 
+            status = "Database connection successful",
+            userCount = userCount
+        });
     }
     catch (Exception ex)
     {
-        return Results.Ok(new { status = "Database connection failed", error = ex.Message });
+        return Results.Ok(new { 
+            status = "Database operation failed", 
+            error = ex.Message,
+            stackTrace = ex.StackTrace?.Substring(0, 500)
+        });
     }
 });
 
