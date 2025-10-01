@@ -307,6 +307,47 @@ app.MapGet("/debug/users", async (AppDb db) =>
     }
 });
 
+// Simple login test endpoint
+app.MapPost("/debug/login-test", async (AppDb db) =>
+{
+    try
+    {
+        Console.WriteLine("[LOGIN-TEST] Starting login test");
+        
+        // Find the admin user
+        var user = await db.Set<AppUser>()
+            .AsNoTracking()
+            .Where(u => u.Email == "admin@example.com")
+            .FirstOrDefaultAsync();
+
+        if (user == null)
+        {
+            return Results.Ok(new { status = "User not found" });
+        }
+
+        // Test password verification
+        var passwordValid = BCrypt.Net.BCrypt.Verify("admin123", user.PasswordHash);
+        
+        return Results.Ok(new
+        {
+            status = "Login test complete",
+            userFound = true,
+            email = user.Email,
+            role = user.Role,
+            hasPassword = !string.IsNullOrEmpty(user.PasswordHash),
+            passwordValid = passwordValid
+        });
+    }
+    catch (Exception ex)
+    {
+        return Results.Ok(new
+        {
+            status = "Login test failed",
+            error = ex.Message
+        });
+    }
+});
+
 var port = Environment.GetEnvironmentVariable("PORT") ?? "5000";
 Console.WriteLine($"Starting server on port: {port}");
 app.Urls.Add($"http://0.0.0.0:{port}");
@@ -327,68 +368,43 @@ var admin = app.MapGroup("/admin").RequireAuthorization("Admin");
 //Login - issue JWT
 app.MapPost("/auth/login", async (LoginRequest req, AppDb db) =>
 {
+    Console.WriteLine($"[LOGIN] === LOGIN ATTEMPT STARTED ===");
+    
     try
     {
-        Console.WriteLine($"[LOGIN] Login attempt started");
-        Console.WriteLine($"[LOGIN] Request received - Email: {req?.Email ?? "null"}");
-
-        if (req == null)
+        // Basic validation
+        if (req == null || string.IsNullOrEmpty(req.Email) || string.IsNullOrEmpty(req.Password))
         {
-            Console.WriteLine("[LOGIN] Request is null");
-            return Results.BadRequest(new { message = "Invalid request" });
+            Console.WriteLine("[LOGIN] Invalid request data");
+            return Results.BadRequest(new { message = "Email and password are required" });
         }
 
-        //find user by email
-        var email = req.Email?.Trim()?.ToLowerInvariant();
-        Console.WriteLine($"[LOGIN] Looking for user with email: {email}");
+        var email = req.Email.Trim().ToLowerInvariant();
+        Console.WriteLine($"[LOGIN] Looking for user: {email}");
 
-        if (string.IsNullOrEmpty(email))
-        {
-            Console.WriteLine("[LOGIN] Email is null or empty");
-            return Results.BadRequest(new { message = "Email is required" });
-        }
-
-        //find user using EF but only select essential columns
+        // Find user
         var user = await db.Set<AppUser>()
             .AsNoTracking()
-            .Where(u => u.Email == email)
-            .Select(u => new AppUser
-            {
-                Id = u.Id,
-                Email = u.Email,
-                PasswordHash = u.PasswordHash,
-                Role = u.Role
-            })
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultAsync(u => u.Email == email);
 
-        if (user is null)
+        if (user == null)
         {
             Console.WriteLine("[LOGIN] User not found");
             return Results.Unauthorized();
         }
 
-        Console.WriteLine($"[LOGIN] User found: {user.Email}, Role: {user.Role}");
-        Console.WriteLine($"[LOGIN] Password hash exists: {!string.IsNullOrEmpty(user.PasswordHash)}");
+        Console.WriteLine($"[LOGIN] User found: {user.Email}");
 
-        if (string.IsNullOrEmpty(req.Password))
+        // Verify password
+        if (!BCrypt.Net.BCrypt.Verify(req.Password, user.PasswordHash))
         {
-            Console.WriteLine("[LOGIN] Password is null or empty");
-            return Results.BadRequest(new { message = "Password is required" });
-        }
-
-        //verify password
-        var passwordValid = BCrypt.Net.BCrypt.Verify(req.Password, user.PasswordHash);
-        Console.WriteLine($"[LOGIN] Password verification result: {passwordValid}");
-
-        if (!passwordValid)
-        {
-            Console.WriteLine("[LOGIN] Password verification failed");
+            Console.WriteLine("[LOGIN] Password invalid");
             return Results.Unauthorized();
         }
 
-        Console.WriteLine("[LOGIN] Password verified successfully, generating JWT...");
+        Console.WriteLine("[LOGIN] Password verified, creating token");
 
-        //build JWT
+        // Create JWT
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
         var claims = new[]
@@ -407,17 +423,19 @@ app.MapPost("/auth/login", async (LoginRequest req, AppDb db) =>
         );
 
         var jwt = new JwtSecurityTokenHandler().WriteToken(token);
-        Console.WriteLine("[LOGIN] JWT generated successfully");
+        Console.WriteLine("[LOGIN] JWT created successfully");
 
-        return Results.Ok(new { token = jwt, user = new { user.Id, user.Email, user.Role } });
+        return Results.Ok(new { 
+            token = jwt, 
+            user = new { user.Id, user.Email, user.Role } 
+        });
     }
     catch (Exception ex)
     {
         Console.WriteLine($"[LOGIN ERROR] {ex.Message}");
         Console.WriteLine($"[LOGIN ERROR] Stack trace: {ex.StackTrace}");
-        return Results.Problem("Internal server error during login");
+        return Results.Problem($"Login failed: {ex.Message}");
     }
-
 });
 
 //Forgot password
