@@ -30,7 +30,6 @@ export type OptionItem = { id: string; optionGroupId: string; sku?: string|null;
 export type Role = { id: string; name: string; slug: string; };
 
 async function j<T>(r: Response): Promise<T> { 
-  console.log("Response status:", r.status, "URL:", r.url);
   if (!r.ok) {
     const text = await r.text();
     console.error("API Error Response:", text);
