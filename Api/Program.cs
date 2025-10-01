@@ -724,10 +724,10 @@ admin.MapGet("/users", async (HttpRequest http, AppDb db) =>
         {
             id = u.Id,
             email = u.Email,
-            username = (string?)null,
+            username = u.Username,
             role = u.Role,
             createdAt = u.CreatedAt,
-            updatedAt = u.CreatedAt
+            updatedAt = u.UpdatedAt
         })
         .ToListAsync();
 
