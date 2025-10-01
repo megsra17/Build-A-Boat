@@ -27,6 +27,9 @@ builder.Services.AddDbContext<AppDb>(opt =>
         ?? builder.Configuration.GetConnectionString("Default");
 
     Console.WriteLine($"Connection string: {connectionString}");
+    Console.WriteLine($"Environment: {builder.Environment.EnvironmentName}");
+    Console.WriteLine($"PORT: {Environment.GetEnvironmentVariable("PORT")}");
+
     opt.UseNpgsql(connectionString);
 });
 
@@ -40,7 +43,6 @@ builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
     var origins = new List<string>
     {
         "http://localhost:3000",
-        "https://buildaboat-web.up.railway.app",
         "https://build-a-boat.vercel.app"
     };
 
@@ -86,6 +88,21 @@ builder.Services.AddAuthorization(o =>
 });
 
 var app = builder.Build();
+
+// Health check endpoint for Railway
+app.MapGet("/", () => Results.Ok(new
+{
+    message = "Build-A-Boat API is running",
+    timestamp = DateTime.UtcNow,
+    environment = app.Environment.EnvironmentName
+}));
+
+app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
+
+var port = Environment.GetEnvironmentVariable("PORT") ?? "5000";
+Console.WriteLine($"Starting server on port: {port}");
+app.Urls.Add($"http://0.0.0.0:{port}");
+
 app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
