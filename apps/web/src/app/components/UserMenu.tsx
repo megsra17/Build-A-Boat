@@ -35,6 +35,8 @@ export default function UserMenu({ user }: { user: UserInfo }) {
     try {
       localStorage.removeItem("jwt");
       localStorage.removeItem("admin_user");
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
       document.cookie = "admin=; Path=/; Max-Age=0";
     } catch {}
     window.location.href = "/admin/login";
