@@ -4,7 +4,7 @@ const getApiBase = () => {
   if (process.env.NODE_ENV === 'production') {
     return process.env.NEXT_PUBLIC_API_BASE || 
            process.env.NEXT_PUBLIC_API_URL ||
-           'https://build-a-boat-production.up.railway.app'; // TODO: Replace with your actual Railway domain
+           'https://build-a-boat-production.up.railway.app'; // Your actual Railway API domain
   }
   
   // For development

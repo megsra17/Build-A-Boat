@@ -104,6 +104,46 @@ builder.Services.AddAuthorization(o =>
 
 var app = builder.Build();
 
+// Ensure database is created and initialize with admin user
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDb>();
+    try
+    {
+        Console.WriteLine("Ensuring database is created...");
+        await db.Database.EnsureCreatedAsync();
+        Console.WriteLine("Database creation completed.");
+
+        // Check if admin user exists, if not create one
+        var adminExists = await db.Users.AnyAsync(u => u.Role == "admin");
+        if (!adminExists)
+        {
+            Console.WriteLine("No admin user found, creating default admin...");
+            var adminUser = new User
+            {
+                Id = Guid.NewGuid(),
+                Email = "admin@example.com",
+                Role = "admin",
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("admin123"),
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+            db.Users.Add(adminUser);
+            await db.SaveChangesAsync();
+            Console.WriteLine($"Admin user created with email: {adminUser.Email} and password: admin123");
+        }
+        else
+        {
+            Console.WriteLine("Admin user already exists.");
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Database initialization error: {ex.Message}");
+        Console.WriteLine($"Stack trace: {ex.StackTrace}");
+    }
+}
+
 // Global exception handling
 app.UseExceptionHandler(errorApp =>
 {
