@@ -4,8 +4,21 @@ import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, EyeOff, Mail, Lock, LogIn } from "lucide-react";
 
-const API = process.env.NEXT_PUBLIC_API_BASE!;
+// Use the same API detection logic as admin-api.ts
+const getApiBase = () => {
+  if (process.env.NODE_ENV === 'production') {
+    return process.env.NEXT_PUBLIC_API_BASE || 
+           process.env.NEXT_PUBLIC_API_URL ||
+           'https://build-a-boat-production.up.railway.app';
+  }
+  return process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5199";
+};
+
+const API = getApiBase();
 const DEV_BYPASS = process.env.NEXT_PUBLIC_DEV_AUTH_BYPASS === "1";
+
+console.log("Login page - API URL:", API);
+console.log("Login page - Environment:", process.env.NODE_ENV);
 
 export default function AdminLoginPage() {
   const r = useRouter();
@@ -24,14 +37,34 @@ export default function AdminLoginPage() {
     setErr(null);
     setBusy(true);
     
+    console.log("Login attempt - API URL:", API);
+    console.log("Login attempt - Full URL:", `${API}/auth/login`);
+    
     try {
       const res = await fetch(`${API}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
-      if (!res.ok) throw new Error("Invalid email or password.");
+      
+      console.log("Login response status:", res.status);
+      console.log("Login response headers:", Object.fromEntries(res.headers.entries()));
+      
+      if (!res.ok) {
+        const text = await res.text();
+        console.error("Login error response:", text);
+        throw new Error("Invalid email or password.");
+      }
+      
+      const contentType = res.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        const text = await res.text();
+        console.error("Non-JSON login response:", text.substring(0, 200));
+        throw new Error(`Expected JSON but got: ${contentType}`);
+      }
+      
       const data = await res.json();
+      console.log("Login successful:", data);
 
       if (remember) localStorage.setItem("jwt", data.token);
       else sessionStorage.setItem("jwt", data.token);
@@ -42,6 +75,7 @@ export default function AdminLoginPage() {
 
       r.replace(next);
     } catch (e: unknown) {
+      console.error("Login error:", e);
       setErr(String(e instanceof Error ? e.message : e));
     } finally {
       setBusy(false);
