@@ -9,7 +9,17 @@ export default function ResetPasswordClient() {
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  const API = process.env.NEXT_PUBLIC_API_BASE!;
+  
+  // Use the same API detection logic as admin-api.ts
+  const getApiBase = () => {
+    if (process.env.NODE_ENV === 'production') {
+      const envUrl = process.env.NEXT_PUBLIC_API_BASE || process.env.NEXT_PUBLIC_API_URL;
+      return envUrl || 'https://build-a-boat-production.up.railway.app';
+    }
+    return process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5199";
+  };
+
+  const API = getApiBase();
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
