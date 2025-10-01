@@ -155,6 +155,45 @@ app.MapGet("/", () => Results.Ok(new
 
 app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
 
+// Initial setup endpoint - creates first admin user (only works if no users exist)
+app.MapPost("/setup/admin", async (AppDb db) =>
+{
+    try
+    {
+        // Check if any users exist
+        var userCount = await db.Set<AppUser>().CountAsync();
+        if (userCount > 0)
+        {
+            return Results.BadRequest(new { message = "Users already exist. Setup not needed." });
+        }
+
+        // Create first admin user
+        var adminUser = new AppUser
+        {
+            Id = Guid.NewGuid(),
+            Email = "admin@example.com",
+            Role = "admin",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("admin123"),
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        db.Set<AppUser>().Add(adminUser);
+        await db.SaveChangesAsync();
+
+        return Results.Ok(new { 
+            message = "Admin user created successfully",
+            email = "admin@example.com",
+            password = "admin123"
+        });
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Setup error: {ex.Message}");
+        return Results.Problem("Failed to create admin user");
+    }
+});
+
 // Debug endpoint to check configuration
 app.MapGet("/debug/config", () => Results.Ok(new
 {
