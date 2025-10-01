@@ -168,7 +168,7 @@ app.UseExceptionHandler(errorApp =>
     });
 });
 
-// Health check endpoint for Railway
+// Health check endpoint for Railway deployment
 app.MapGet("/", () => Results.Ok(new
 {
     message = "Build-A-Boat API is running",
