@@ -305,3 +305,64 @@ public class ConstraintEngine
         return errors;
     }
 }
+
+// Email service interface
+public interface IEmailService
+{
+    Task SendPasswordResetEmailAsync(string toEmail, string resetToken);
+}
+
+// Simple email service implementation
+public class EmailService : IEmailService
+{
+    private readonly IConfiguration _config;
+
+    public EmailService(IConfiguration config)
+    {
+        _config = config;
+    }
+
+    public async Task SendPasswordResetEmailAsync(string toEmail, string resetToken)
+    {
+        try
+        {
+            // For now, just log the email details
+            // In production, you'd implement actual email sending
+            Console.WriteLine($"[EMAIL] Would send password reset email to: {toEmail}");
+            Console.WriteLine($"[EMAIL] Reset token: {resetToken}");
+            Console.WriteLine($"[EMAIL] Reset link: https://build-a-boat.vercel.app/admin/reset-password?token={resetToken}");
+
+            // TODO: Implement actual email sending with SMTP, SendGrid, etc.
+            // Example with SMTP (requires MailKit NuGet package):
+            /*
+            using var client = new SmtpClient();
+            await client.ConnectAsync(_config["Email:SmtpHost"], int.Parse(_config["Email:SmtpPort"]), true);
+            await client.AuthenticateAsync(_config["Email:SmtpUser"], _config["Email:SmtpPassword"]);
+            
+            var message = new MimeMessage();
+            message.From.Add(new MailboxAddress("Build-A-Boat", _config["Email:FromAddress"]));
+            message.To.Add(new MailboxAddress("", toEmail));
+            message.Subject = "Reset Your Password";
+            message.Body = new TextPart("html")
+            {
+                Text = $@"
+                    <h2>Reset Your Password</h2>
+                    <p>Click the link below to reset your password:</p>
+                    <a href='https://build-a-boat.vercel.app/admin/reset-password?token={resetToken}'>Reset Password</a>
+                    <p>This link will expire in 1 hour.</p>
+                "
+            };
+            
+            await client.SendAsync(message);
+            await client.DisconnectAsync(true);
+            */
+
+            await Task.CompletedTask; // Placeholder for async operation
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[EMAIL ERROR] Failed to send email: {ex.Message}");
+            throw;
+        }
+    }
+}

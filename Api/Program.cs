@@ -94,6 +94,9 @@ builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
 builder.Services.AddScoped<PricingEngine>();
 builder.Services.AddScoped<ConstraintEngine>();
 
+// Add email service
+builder.Services.AddScoped<IEmailService, EmailService>();
+
 //Auth
 var jwtSection = builder.Configuration.GetSection("Jwt");
 var jwtSecret = Environment.GetEnvironmentVariable("JWT_SECRET") ?? jwtSection["Secret"];
@@ -313,7 +316,7 @@ app.MapPost("/debug/login-test", async (AppDb db) =>
     try
     {
         Console.WriteLine("[LOGIN-TEST] Starting login test");
-        
+
         // Find the admin user
         var user = await db.Set<AppUser>()
             .AsNoTracking()
@@ -327,7 +330,7 @@ app.MapPost("/debug/login-test", async (AppDb db) =>
 
         // Test password verification
         var passwordValid = BCrypt.Net.BCrypt.Verify("admin123", user.PasswordHash);
-        
+
         return Results.Ok(new
         {
             status = "Login test complete",
@@ -369,7 +372,7 @@ var admin = app.MapGroup("/admin").RequireAuthorization("Admin");
 app.MapPost("/auth/login", async (LoginRequest req, AppDb db) =>
 {
     Console.WriteLine($"[LOGIN] === LOGIN ATTEMPT STARTED ===");
-    
+
     try
     {
         // Basic validation
@@ -425,18 +428,20 @@ app.MapPost("/auth/login", async (LoginRequest req, AppDb db) =>
         var jwt = new JwtSecurityTokenHandler().WriteToken(token);
         Console.WriteLine("[LOGIN] JWT created successfully");
 
-        return Results.Ok(new { 
-            token = jwt, 
-            user = new { 
-                user.Id, 
-                user.Email, 
+        return Results.Ok(new
+        {
+            token = jwt,
+            user = new
+            {
+                user.Id,
+                user.Email,
                 user.Role,
                 user.Username,
                 user.FirstName,
                 user.LastName,
                 user.Timezone,
                 user.AvatarUrl
-            } 
+            }
         });
     }
     catch (Exception ex)
@@ -448,7 +453,7 @@ app.MapPost("/auth/login", async (LoginRequest req, AppDb db) =>
 });
 
 //Forgot password
-app.MapPost("/auth/forgot-password", async (ForgotPasswordRequest req, AppDb db) =>
+app.MapPost("/auth/forgot-password", async (ForgotPasswordRequest req, AppDb db, IEmailService emailService) =>
 {
     var email = req.Email.Trim().ToLowerInvariant();
     var user = await db.Set<AppUser>()
@@ -458,6 +463,7 @@ app.MapPost("/auth/forgot-password", async (ForgotPasswordRequest req, AppDb db)
         .FirstOrDefaultAsync();
 
     if (user is null) return Results.Ok(new { message = "If that email is registered, a reset link has been sent." });
+
     var token = Guid.NewGuid().ToString("N");
     var expiry = DateTime.UtcNow.AddHours(1);
 
@@ -469,8 +475,24 @@ app.MapPost("/auth/forgot-password", async (ForgotPasswordRequest req, AppDb db)
         new NpgsqlParameter("expiresAt", expiry)
     );
 
-    //TODO: send email with link (for now just return the token)
-    return Results.Ok(new { message = "If that email is registered, a reset link has been sent." });
+    // Send password reset email
+    try
+    {
+        await emailService.SendPasswordResetEmailAsync(user.Email, token);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[EMAIL ERROR] Failed to send password reset email: {ex.Message}");
+        // Don't fail the request if email fails - still return success message for security
+    }
+
+    return Results.Ok(new
+    {
+        message = "If that email is registered, a reset link has been sent.",
+        // Remove these in production - only for development/testing
+        resetToken = token,
+        resetLink = $"https://build-a-boat.vercel.app/admin/reset-password?token={token}"
+    });
 });
 
 //Reset password
