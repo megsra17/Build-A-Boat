@@ -30,10 +30,14 @@ builder.Services.AddDbContext<AppDb>(opt =>
     Console.WriteLine($"Environment: {builder.Environment.EnvironmentName}");
     Console.WriteLine($"PORT: {Environment.GetEnvironmentVariable("PORT")}");
 
-    opt.UseNpgsql(connectionString);
-});
+    if (string.IsNullOrEmpty(connectionString) || connectionString == "placeholder")
+    {
+        Console.WriteLine("ERROR: No valid database connection string found!");
+        throw new InvalidOperationException("DATABASE_URL environment variable is required");
+    }
 
-// Swagger
+    opt.UseNpgsql(connectionString);
+});// Swagger
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -62,9 +66,20 @@ builder.Services.AddScoped<ConstraintEngine>();
 
 //Auth
 var jwtSection = builder.Configuration.GetSection("Jwt");
-var jwtSecret = Environment.GetEnvironmentVariable("JWT_SECRET") ?? jwtSection["Secret"]!;
-var jwtIssuer = Environment.GetEnvironmentVariable("JWT_ISSUER") ?? jwtSection["Issuer"]!;
-var jwtAudience = Environment.GetEnvironmentVariable("JWT_AUDIENCE") ?? jwtSection["Audience"]!;
+var jwtSecret = Environment.GetEnvironmentVariable("JWT_SECRET") ?? jwtSection["Secret"];
+var jwtIssuer = Environment.GetEnvironmentVariable("JWT_ISSUER") ?? jwtSection["Issuer"];
+var jwtAudience = Environment.GetEnvironmentVariable("JWT_AUDIENCE") ?? jwtSection["Audience"];
+
+Console.WriteLine($"JWT Secret set: {!string.IsNullOrEmpty(jwtSecret)}");
+Console.WriteLine($"JWT Issuer: {jwtIssuer}");
+Console.WriteLine($"JWT Audience: {jwtAudience}");
+
+if (string.IsNullOrEmpty(jwtSecret))
+{
+    Console.WriteLine("ERROR: JWT_SECRET is required but not set!");
+    throw new InvalidOperationException("JWT_SECRET environment variable is required");
+}
+
 var jwtKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret));
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -88,6 +103,30 @@ builder.Services.AddAuthorization(o =>
 });
 
 var app = builder.Build();
+
+// Global exception handling
+app.UseExceptionHandler(errorApp =>
+{
+    errorApp.Run(async context =>
+    {
+        context.Response.StatusCode = 500;
+        context.Response.ContentType = "application/json";
+
+        var error = context.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>();
+        if (error != null)
+        {
+            Console.WriteLine($"Global error: {error.Error.Message}");
+            Console.WriteLine($"Stack trace: {error.Error.StackTrace}");
+
+            await context.Response.WriteAsync(System.Text.Json.JsonSerializer.Serialize(new
+            {
+                error = "Internal server error",
+                message = error.Error.Message,
+                timestamp = DateTime.UtcNow
+            }));
+        }
+    });
+});
 
 // Health check endpoint for Railway
 app.MapGet("/", () => Results.Ok(new
