@@ -27,7 +27,8 @@ export default function NewBoatPage() {
   const [slug, setSlug] = useState("");
   const [modelYear, setModelYear] = useState<number | undefined>(undefined);
   const [msrp, setMsrp] = useState<number | undefined>(undefined);
-  const [categories, setCategories] = useState<string[]>([]);
+  const [categories, setCategories] = useState<{id: string, slug: string, name: string}[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState("");
   const [featDraft, setFeatDraft] = useState("");
   const [features, setFeatures] = useState<string[]>([]);
 
@@ -71,6 +72,18 @@ export default function NewBoatPage() {
     })();
   }, []);
 
+  useEffect(() => {
+  (async () => {
+    try{
+      const jwt = localStorage.getItem("jwt") || sessionStorage.getItem("jwt");
+      const res = await fetch(`${API}/admin/categories`, { headers: jwt ? { Authorization: `Bearer ${jwt}` } : {} });
+      if (!res.ok) return;
+      setCategories(await res.json());
+    }catch{}
+  })();
+}, []);
+
+
   function addFeature() {
     const val = featDraft.trim();
     if(!val) return;
@@ -111,8 +124,7 @@ export default function NewBoatPage() {
         Slug: slug || toSlug(name),
         Name: name,
         ModelYear: typeof modelYear === "number" ? modelYear : Number(modelYear || 0),
-        BasePrice: typeof msrp === "number" ? msrp : Number(msrp || 0),
-        Categories: categories || null,
+        Categories: selectedCategory ? [selectedCategory] : null,
         Features: features,
         PrimaryImageUrl: primary?.Url ?? null,
         SecondaryImageUrl: secondary?.Url ?? null,
@@ -196,20 +208,17 @@ export default function NewBoatPage() {
               className="w-full rounded-md bg-black/40 border border-white/15 px-3 py-2 outline-none"
             />
           </div>
-
           <div>
             <label className="block text-sm text-white/70 mb-2">Category</label>
-            <div className="relative">
-              <input
-                value={categories.join(', ')}
-                onChange={(e) => setCategories(e.target.value.split(',').map(cat => cat.trim()).filter(cat => cat.length > 0))}
-                placeholder="(optional)"
-                className="w-full rounded-md bg-black/40 border border-white/15 px-3 py-2 pr-8 outline-none"
-              />
-              <ChevronDown className="size-4 absolute right-2 top-1/2 -translate-y-1/2 text-white/40" />
-            </div>
+            <select
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+              className="w-full rounded-md bg-black/40 border border-white/15 px-3 py-2 outline-none"
+            >
+              <option value="">(none)</option>
+            {categories.map(c => <option key={c.id} value={c.slug}>{c.name}</option>)}
+          </select>
           </div>
-
           <div>
             <label className="block text-sm text-white/70 mb-2">Slug</label>
             <input
