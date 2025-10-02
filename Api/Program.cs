@@ -835,9 +835,34 @@ admin.MapGet("/boats", async (HttpRequest req, AppDb db) =>
 //Create boat
 admin.MapPost("/boats", async (BoatUpsert dto, AppDb db) =>
 {
-    var b = new Boat { Id = Guid.NewGuid(), Slug = dto.Slug, Name = dto.Name, BasePrice = dto.BasePrice, ModelYear = dto.ModelYear, IsActive = true };
-    db.Boats.Add(b);
-    await db.SaveChangesAsync();
+    var b = new Boat
+    {
+        Id = Guid.NewGuid(),
+        Slug = dto.Slug,
+        Name = dto.Name,
+        BasePrice = dto.BasePrice,
+        ModelYear = dto.ModelYear,
+        IsActive = true,
+
+        // New columns (add to your Boat entity)
+        Category = dto.Category,
+        Features = dto.Features is null ? null : JsonSerializer.SerializeToNode(dto.Features),
+        PrimaryImageUrl = dto.PrimaryImageUrl,
+        SecondaryImageUrl = dto.SecondaryImageUrl,
+        SideImageUrl = dto.SideImageUrl,
+        LogoImageUrl = dto.LogoImageUrl
+    };
+    if (dto.LayerMediaIds is { Count: > 0 })
+    {
+        var rows = dto.LayerMediaIds.Select((mid, i) => new BoatLayerMedia
+        {
+            BoatId = b.Id,
+            MediaId = mid,
+            SortOrder = i
+        });
+        db.BoatLayerMedias.AddRange(rows);
+        await db.SaveChangesAsync();
+    }
     return Results.Created($"/admin/boats/{b.Id}", b);
 });
 
@@ -899,6 +924,48 @@ admin.MapDelete("/boats/{id:guid}", async (Guid id, AppDb db) =>
     return Results.NoContent();
 });
 
+//media
+admin.MapGet("/media", async (AppDb db) =>
+{
+    return Results.Ok(await db.Media.OrderByDescending(m => m.Id).ToListAsync());
+});
+
+//create media
+admin.MapPost("/media", async (MediaCreateDto dto, AppDb db) =>
+{
+    if (string.IsNullOrWhiteSpace(dto.Url)) return Results.BadRequest(new { message = "Url required" });
+    var m = new Media { Id = Guid.NewGuid(), Url = dto.Url, Label = dto.Label };
+    db.Media.Add(m);
+    await db.SaveChangesAsync();
+    return Results.Created($"/admin/media/{m.Id}", m);
+});
+
+//upload media
+admin.MapPost("/media/upload", async (HttpRequest req, IWebHostEnvironment env, AppDb db) =>
+{
+    if (!req.HasFormContentType)
+        return Results.BadRequest(new { message = "Invalid form data" });
+
+    var form = await req.ReadFormAsync();
+    var file = form.Files.GetFile("file");
+    if (file is null || file.Length == 0)
+        return Results.BadRequest(new { message = "No file uploaded" });
+
+    //TODO In production, you would upload to S3 or another storage service
+    // Here we just simulate by saving metadata to the database
+    var m = new Media
+    {
+        Id = Guid.NewGuid(),
+        FileName = file.FileName,
+        ContentType = file.ContentType,
+        Url = $"https://example.com/media/{Guid.NewGuid()}/{file.FileName}", // Placeholder URL
+        UploadedAt = DateTime.UtcNow
+    };
+    db.Media.Add(m);
+    await db.SaveChangesAsync();
+    return Results.Created($"/admin/media/{m.Id}", m);
+});
+
 // Categories
 admin.MapGet("/boats/{boatId:guid}/categories", async (Guid boatId, AppDb db) =>
     Results.Ok(await db.Categories.Where(c => c.BoatId == boatId).OrderBy(c => c.SortOrder).ToListAsync()));
@@ -912,7 +979,7 @@ admin.MapPost("/categories", async (CategoryUpsert dto, AppDb db) =>
     return Results.Created($"/admin/categories/{c.Id}", c);
 });
 
-//
+// Update category
 admin.MapPatch("/categories/{id:guid}", async (Guid id, CategoryUpsert dto, AppDb db) =>
 {
     var c = await db.Categories.FindAsync(id);

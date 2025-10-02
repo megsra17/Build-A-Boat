@@ -151,6 +151,22 @@ public class Category
     public ICollection<OptionGroup> OptionsGroups { get; set; } = new List<OptionGroup>();
 }
 
+public class BoatLayerMedia
+{
+    public Guid BoatId { get; set; }
+    public Guid MediaId { get; set; }
+    public int SortOrder { get; set; }
+}
+
+public class Media
+{
+    public Guid Id { get; set; }
+    public string Url { get; set; } = default!;
+    public string? Label { get; set; }
+    public int? W { get; set; }
+    public int? H { get; set; }
+}
+
 public class OptionGroup
 {
     public Guid Id { get; set; }
