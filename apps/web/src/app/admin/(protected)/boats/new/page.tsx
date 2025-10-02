@@ -1,9 +1,8 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import {useRouter} from "next/navigation";
-import {Plus, Check, ChevronDown} from "lucide-react";
-import { number, set } from "zod";
+import {Plus, Check} from "lucide-react";
 
 const API = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5199";
 
@@ -15,22 +14,18 @@ type Media = {
   h?: number | null;
 };
 
-function toSlug(s: string){
-  return s.trim().toLowerCase().replace(/[^a-z09]+/g, '-').replace(/^-+|-+$/g, '');
-}
-
 export default function NewBoatPage() {
   const r = useRouter();
 
   //form state
   const [name, setName] = useState("");
-  const [slug, setSlug] = useState("");
   const [modelYear, setModelYear] = useState<number | undefined>(undefined);
   const [msrp, setMsrp] = useState<number | undefined>(undefined);
   const [categories, setCategories] = useState<{id: string, slug: string, name: string}[]>([]);
   const [selectedCategory, setSelectedCategory] = useState("");
   const [featDraft, setFeatDraft] = useState("");
   const [features, setFeatures] = useState<string[]>([]);
+  const [nextSlugNumber, setNextSlugNumber] = useState<number>(0);
 
   //images (store media Ids or Urls)
   const [primary, setPrimary] = useState<Media | null>(null);
@@ -49,10 +44,29 @@ export default function NewBoatPage() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  //derive slug from name if user hasnt manually edited it
-  useEffect(() =>{
-    setSlug(prev => (prev ? prev : toSlug(name)));
-  }, [name]);
+  // Fetch next available slug number
+  useEffect(() => {
+    (async () => {
+      try{
+        const jwt = typeof window !== "undefined" ? localStorage.getItem("jwt") || sessionStorage.getItem("jwt") : null;
+        const res = await fetch(`${API}/admin/boats`, {
+          headers: jwt ? {Authorization: `Bearer ${jwt}`} : {},
+        });
+        if(res.ok) {
+          const boats = await res.json();
+          // Find the highest numeric slug and add 1
+          const maxSlug = boats.reduce((max: number, boat: {slug?: string}) => {
+            const slugNum = parseInt(boat.slug || "0");
+            return isNaN(slugNum) ? max : Math.max(max, slugNum);
+          }, -1);
+          setNextSlugNumber(maxSlug + 1);
+        }
+      } catch {
+        // If fetch fails, start at 0
+        setNextSlugNumber(0);
+      }
+    })();
+  }, []);
 
   useEffect(() =>{
     //fetch media list for picker
@@ -95,20 +109,6 @@ export default function NewBoatPage() {
     setFeatures(fs => fs.filter(x => x !== f));
   }
 
-  function pickMedia(m: Media) {
-    if(!mediaOpen) return;
-    if(mediaOpen.target === "layers"){
-      setLayers(l => [...l,m]);
-    }else{
-      const setter = mediaOpen.target === "primary" ? setPrimary
-        : mediaOpen.target === "secondary" ? setSecondary
-        : mediaOpen.target === "side" ? setSide
-        : setLogo;
-      setter(m);
-    }
-    setMediaOpen(null);
-  }
-
   function removeLayer(i: number){
     setLayers(l => l.filter((_, idx) => idx !== i));
   }
@@ -121,7 +121,7 @@ export default function NewBoatPage() {
       const jwt = typeof window !== "undefined" ? localStorage.getItem("jwt") || sessionStorage.getItem("jwt") : null;
 
       const body ={
-        Slug: slug || toSlug(name),
+        Slug: nextSlugNumber.toString(),
         Name: name,
         ModelYear: typeof modelYear === "number" ? modelYear : Number(modelYear || 0),
         Categories: selectedCategory ? [selectedCategory] : null,
@@ -219,14 +219,7 @@ export default function NewBoatPage() {
             {categories.map(c => <option key={c.id} value={c.slug}>{c.name}</option>)}
           </select>
           </div>
-          <div>
-            <label className="block text-sm text-white/70 mb-2">Slug</label>
-            <input
-              value={slug}
-              onChange={(e) => setSlug(toSlug(e.target.value))}
-              className="w-full rounded-md bg-black/40 border border-white/15 px-3 py-2 outline-none font-mono text-sm"
-            />
-          </div>
+          {/* Slug is auto-generated from name, hidden from user */}
         </div>
       </section>
 
