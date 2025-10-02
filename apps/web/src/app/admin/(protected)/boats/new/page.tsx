@@ -170,79 +170,80 @@ export default function NewBoatPage() {
     setMediaOpen(null);
   }
   return (
-    <div className="max-w-4xl mx-auto">
-      <form onSubmit={submit} className="space-y-6">
+    <div className="max-w-6xl mx-auto">
+      <form onSubmit={submit} className="space-y-8">
         <header className="flex items-center gap-3 mb-8">
           <span className="text-2xl font-semibold">Add New Boat</span>
           {busy && <span className="text-sm text-white/50">Saving...</span>}
         </header>
 
-        {err && <div className="p-3 bg-red-600/20 border border-red-600 text-red-300 rounded-lg mb-6">{err}</div>}
+        {err && <div className="p-4 bg-red-600/20 border border-red-600 text-red-300 rounded-lg mb-8">{err}</div>}
 
-        {/* Single Container for Everything */}
-        <div className="rounded-xl border border-white/10 bg-[#151515] p-8 space-y-8">
-          
-          {/* Boat Details Section */}
-          <div>
-            <h2 className="text-xl font-semibold mb-6">Boat Details</h2>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              <div>
-                <label className="block text-sm text-white/70 mb-2">Model Year</label>
-                <input 
-                  inputMode="numeric"
-                  value={modelYear}
-                  onChange={(e) => setModelYear(e.target.value ? Number(e.target.value) : undefined)}
-                  className="w-full rounded-md bg-black/40 border border-white/15 px-3 py-2 outline-none"
-                />
-              </div>
+        {/* Basic Info Section */}
+        <section className="rounded-xl border border-white/10 bg-[#151515] p-8">
+          <h2 className="text-xl font-semibold mb-8">Basic Info</h2>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+            <div>
+              <label className="block text-sm text-white/70 mb-3">Model Year</label>
+              <input 
+                inputMode="numeric"
+                value={modelYear}
+                onChange={(e) => setModelYear(e.target.value ? Number(e.target.value) : undefined)}
+                className="w-full rounded-md bg-black/40 border border-white/15 px-4 py-3 outline-none"
+              />
+            </div>
 
-              <div className="md:col-span-2">
-                <label className="block text-sm text-white/70 mb-2">Name</label>
-                <input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full rounded-md bg-black/40 border border-white/15 px-3 py-2 outline-none"
-                />
-              </div>
+            <div className="md:col-span-2">
+              <label className="block text-sm text-white/70 mb-3">Name</label>
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full rounded-md bg-black/40 border border-white/15 px-4 py-3 outline-none"
+              />
+            </div>
 
-              <div>
-                <label className="block text-sm text-white/70 mb-2">MSRP</label>
-                <input
-                  inputMode="decimal"
-                  value={msrp}
-                  onChange={(e) => setMsrp(e.target.value ? Number(e.target.value) : undefined)}
-                  className="w-full rounded-md bg-black/40 border border-white/15 px-3 py-2 outline-none"
-                />
-              </div>
+            <div>
+              <label className="block text-sm text-white/70 mb-3">MSRP</label>
+              <input
+                inputMode="decimal"
+                value={msrp}
+                onChange={(e) => setMsrp(e.target.value ? Number(e.target.value) : undefined)}
+                className="w-full rounded-md bg-black/40 border border-white/15 px-4 py-3 outline-none"
+              />
+            </div>
 
-              <div className="md:col-span-4">
-                <label className="block text-sm text-white/70 mb-2">Category</label>
-                <select
-                  value={selectedCategory}
-                  onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="w-full max-w-xs rounded-md bg-black/40 border border-white/15 px-3 py-2 outline-none"
-                >
-                  <option value="">(none)</option>
-                  {categories.map(c => <option key={c.id} value={c.slug}>{c.name}</option>)}
-                </select>
-              </div>
+            <div className="md:col-span-4 mt-4">
+              <label className="block text-sm text-white/70 mb-3">Category</label>
+              <select
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+                className="w-full max-w-xs rounded-md bg-black/40 border border-white/15 px-4 py-3 outline-none"
+              >
+                <option value="">(none)</option>
+                {categories.map(c => <option key={c.id} value={c.slug}>{c.name}</option>)}
+              </select>
             </div>
           </div>
+        </section>
 
-          {/* Features Section */}
-          <div className="border-t border-white/10 pt-8">
-            <h3 className="text-lg font-semibold mb-4">Features</h3>
-            <div className="flex items-center gap-2 mb-4">
+        {/* General Images/Features Section */}
+        <section className="rounded-xl border border-white/10 bg-[#151515] p-8">
+          <h2 className="text-xl font-semibold mb-8">General Images/Features</h2>
+          
+          {/* Features */}
+          <div className="mb-12">
+            <label className="block text-sm text-white/70 mb-4">Features</label>
+            <div className="flex items-center gap-3 mb-6">
               <input
                 value={featDraft}
                 onChange={(e) => setFeatDraft(e.target.value)}
                 placeholder="Add a feature…"
-                className="w-72 rounded-md bg-black/40 border border-white/15 px-3 py-2 outline-none"
+                className="w-80 rounded-md bg-black/40 border border-white/15 px-4 py-3 outline-none"
               />
               <button
                 type="button"
                 onClick={addFeature}
-                className="inline-flex items-center gap-1 rounded-full border border-amber-500/40 text-amber-300 px-3 py-1 hover:bg-amber-500/10"
+                className="inline-flex items-center gap-2 rounded-full border border-amber-500/40 text-amber-300 px-4 py-2 hover:bg-amber-500/10"
               >
                 <Plus className="size-4" />
                 Add
@@ -250,13 +251,13 @@ export default function NewBoatPage() {
             </div>
 
             {!!features.length && (
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-3">
                 {features.map((f) => (
                   <button
                     key={f}
                     type="button"
                     onClick={() => removeFeature(f)}
-                    className="rounded-full bg-white/5 border border-white/10 px-3 py-1 text-sm hover:bg-white/10"
+                    className="rounded-full bg-white/5 border border-white/10 px-4 py-2 text-sm hover:bg-white/10"
                     title="Remove"
                   >
                     {f}
@@ -267,81 +268,78 @@ export default function NewBoatPage() {
             )}
           </div>
 
-          {/* Images Section */}
-          <div className="border-t border-white/10 pt-8">
-            <h3 className="text-lg font-semibold mb-4">Images</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-              {([
-                { label: "Primary Image", key: "primary", val: primary },
-                { label: "Secondary Image", key: "secondary", val: secondary },
-                { label: "Side Image", key: "side", val: side },
-                { label: "Logo", key: "logo", val: logo },
-              ] as const).map((it) => (
-                <div key={it.key}>
-                  <div className="mb-2 text-sm text-white/70">{it.label}</div>
+          {/* Images */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+            {([
+              { label: "Primary Image", key: "primary", val: primary },
+              { label: "Secondary Image", key: "secondary", val: secondary },
+              { label: "Side Image", key: "side", val: side },
+              { label: "Graphic Logo", key: "logo", val: logo },
+            ] as const).map((it) => (
+              <div key={it.key}>
+                <div className="mb-4 text-sm text-white/70 font-medium">{it.label}</div>
+                <button
+                  type="button"
+                  onClick={() => setMediaOpen({ target: it.key })}
+                  className="group w-full aspect-square rounded-xl bg-black/60 border border-white/10 flex items-center justify-center overflow-hidden hover:border-white/30 transition-colors"
+                  title="Select media"
+                >
+                  {it.val ? (
+                    <img
+                      src={it.val.Url}
+                      alt={it.val.label ?? it.label}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="text-white/40 text-sm">Select</div>
+                  )}
+                </button>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Builder Layers Section */}
+        <section className="rounded-xl border border-white/10 bg-[#151515] p-8">
+          <div className="flex items-center justify-between mb-8">
+            <h2 className="text-xl font-semibold">Builder Layers</h2>
+            <button
+              type="button"
+              onClick={() => setMediaOpen({ target: "layers" })}
+              className="rounded-full border border-amber-500/40 text-amber-300 px-6 py-3 hover:bg-amber-500/10"
+            >
+              Select Media
+            </button>
+          </div>
+
+          {!!layers.length && (
+            <div className="grid grid-cols-3 md:grid-cols-6 gap-4">
+              {layers.map((m, i) => (
+                <div key={`${m.Id}-${i}`} className="relative rounded-lg overflow-hidden border border-white/10">
+                  <img src={m.Url} alt={m.label ?? ""} className="w-full h-24 object-cover" />
                   <button
                     type="button"
-                    onClick={() => setMediaOpen({ target: it.key })}
-                    className="group w-full aspect-square rounded-lg bg-black/60 border border-white/10 flex items-center justify-center overflow-hidden hover:border-white/30 transition-colors"
-                    title="Select media"
+                    onClick={() => removeLayer(i)}
+                    className="absolute top-2 right-2 size-6 rounded-full bg-black/70 border border-white/20 text-white/80 hover:bg-red-600/70"
+                    title="Remove"
                   >
-                    {it.val ? (
-                      <img
-                        src={it.val.Url}
-                        alt={it.val.label ?? it.label}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="text-white/40 text-sm">Select</div>
-                    )}
+                    ×
                   </button>
                 </div>
               ))}
             </div>
-          </div>
+          )}
+        </section>
 
-          {/* Builder Layers Section */}
-          <div className="border-t border-white/10 pt-8">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold">Builder Layers</h3>
-              <button
-                type="button"
-                onClick={() => setMediaOpen({ target: "layers" })}
-                className="rounded-full border border-amber-500/40 text-amber-300 px-4 py-2 hover:bg-amber-500/10"
-              >
-                Select Media
-              </button>
-            </div>
-
-            {!!layers.length && (
-              <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
-                {layers.map((m, i) => (
-                  <div key={`${m.Id}-${i}`} className="relative rounded-lg overflow-hidden border border-white/10">
-                    <img src={m.Url} alt={m.label ?? ""} className="w-full h-20 object-cover" />
-                    <button
-                      type="button"
-                      onClick={() => removeLayer(i)}
-                      className="absolute top-1 right-1 size-6 rounded-full bg-black/70 border border-white/20 text-white/80 hover:bg-red-600/70"
-                      title="Remove"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Save Button */}
-          <div className="border-t border-white/10 pt-8 flex justify-end">
-            <button
-              disabled={busy || !name || !modelYear || !msrp}
-              className="inline-flex items-center gap-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-medium px-6 py-3 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Check className="size-4" />
-              Save Boat
-            </button>
-          </div>
+        {/* Save Button */}
+        <div className="flex justify-end">
+          <button
+            disabled={busy || !name || !modelYear || !msrp}
+            className="inline-flex items-center gap-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-medium px-8 py-4 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Check className="size-4" />
+            Save Boat
+          </button>
         </div>
 
         {/* Media Picker Modal */}
