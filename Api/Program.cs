@@ -845,7 +845,6 @@ admin.MapPost("/boats", async (BoatUpsert dto, AppDb db) =>
         IsActive = true,
 
         // New columns (add to your Boat entity)
-        Category = dto.Category,
         Features = dto.Features is null ? null : JsonSerializer.SerializeToNode(dto.Features),
         PrimaryImageUrl = dto.PrimaryImageUrl,
         SecondaryImageUrl = dto.SecondaryImageUrl,

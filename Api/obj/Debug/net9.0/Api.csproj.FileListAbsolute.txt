@@ -118,3 +118,5 @@
 /Users/meganrakow/Desktop/Build-A-Boat/Api/obj/Debug/net9.0/ref/Api.dll
 /Users/meganrakow/Desktop/Build-A-Boat/Api/bin/Debug/net9.0/DotNetEnv.dll
 /Users/meganrakow/Desktop/Build-A-Boat/Api/bin/Debug/net9.0/Sprache.dll
+/Users/Megan/Desktop/Build A Boat/Api/bin/Debug/net9.0/DotNetEnv.dll
+/Users/Megan/Desktop/Build A Boat/Api/bin/Debug/net9.0/Sprache.dll

@@ -34,6 +34,8 @@ public class AppDb : DbContext
     public DbSet<ConstraintRule> ConstraintRules => Set<ConstraintRule>();
     public DbSet<PricingRule> PricingRules => Set<PricingRule>();
     public DbSet<Build> Builds => Set<Build>();
+    public DbSet<Media> Media => Set<Media>();
+    public DbSet<BoatLayerMedia> BoatLayerMedias => Set<BoatLayerMedia>();
 
     public DbSet<AppSettings> Settings => Set<AppSettings>();
 
@@ -78,15 +80,38 @@ public class AppDb : DbContext
         b.Entity<Boat>().Property(x => x.IsActive).HasColumnName("is_active");
         b.Entity<Boat>().Property(x => x.ModelYear).HasColumnName("model_year");
         b.Entity<Boat>().Property(x => x.HeroImageUrl).HasColumnName("hero_image_url");
+        b.Entity<Boat>().Property(x => x.Features).HasColumnName("features").HasColumnType("jsonb");
+        b.Entity<Boat>().Property(x => x.PrimaryImageUrl).HasColumnName("primary_image_url");
+        b.Entity<Boat>().Property(x => x.SecondaryImageUrl).HasColumnName("secondary_image_url");
+        b.Entity<Boat>().Property(x => x.SideImageUrl).HasColumnName("side_image_url");
+        b.Entity<Boat>().Property(x => x.LogoImageUrl).HasColumnName("logo_image_url");
         b.Entity<Category>().ToTable("category");
         b.Entity<OptionGroup>().ToTable("option_group");
         b.Entity<Option>().ToTable("option"); // quoted table in SQL; EF will quote it
         b.Entity<ConstraintRule>().ToTable("constraint_rule");
         b.Entity<PricingRule>().ToTable("pricing_rule");
         b.Entity<Build>().ToTable("build");
+        b.Entity<Media>().ToTable("media");
+        b.Entity<BoatLayerMedia>().ToTable("boat_layer_media");
 
         // Column fixes that don't match by name
         b.Entity<Option>().Property(x => x.Price).HasColumnName("price_delta");
+
+        // Media entity configuration
+        b.Entity<Media>().Property(x => x.Id).HasColumnName("id");
+        b.Entity<Media>().Property(x => x.Url).HasColumnName("url");
+        b.Entity<Media>().Property(x => x.Label).HasColumnName("label");
+        b.Entity<Media>().Property(x => x.FileName).HasColumnName("file_name");
+        b.Entity<Media>().Property(x => x.ContentType).HasColumnName("content_type");
+        b.Entity<Media>().Property(x => x.UploadedAt).HasColumnName("uploaded_at");
+        b.Entity<Media>().Property(x => x.W).HasColumnName("w");
+        b.Entity<Media>().Property(x => x.H).HasColumnName("h");
+
+        // BoatLayerMedia entity configuration (composite key)
+        b.Entity<BoatLayerMedia>().HasKey(x => new { x.BoatId, x.MediaId });
+        b.Entity<BoatLayerMedia>().Property(x => x.BoatId).HasColumnName("boat_id");
+        b.Entity<BoatLayerMedia>().Property(x => x.MediaId).HasColumnName("media_id");
+        b.Entity<BoatLayerMedia>().Property(x => x.SortOrder).HasColumnName("sort_order");
 
         // Optional indexes/relationships
         b.Entity<Boat>().HasIndex(x => x.Slug).IsUnique();
@@ -137,6 +162,11 @@ public class Boat
     public bool IsActive { get; set; } = true;
     public int? ModelYear { get; set; }
     public string? HeroImageUrl { get; set; }
+    public JsonNode? Features { get; set; }
+    public string? PrimaryImageUrl { get; set; }
+    public string? SecondaryImageUrl { get; set; }
+    public string? SideImageUrl { get; set; }
+    public string? LogoImageUrl { get; set; }
     public ICollection<Category> Categories { get; set; } = new List<Category>();
 }
 
@@ -163,6 +193,9 @@ public class Media
     public Guid Id { get; set; }
     public string Url { get; set; } = default!;
     public string? Label { get; set; }
+    public string? FileName { get; set; }
+    public string? ContentType { get; set; }
+    public DateTime? UploadedAt { get; set; }
     public int? W { get; set; }
     public int? H { get; set; }
 }

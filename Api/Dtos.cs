@@ -5,7 +5,6 @@ public record BoatUpsert(
     string Name,
     decimal BasePrice,
     int ModelYear,
-    string? Category,
     string[]? Features,
     string? PrimaryImageUrl,
     string? SecondaryImageUrl,
@@ -16,6 +15,7 @@ public record BoatUpsert(
 public record DuplicateBoatDto(string NewSlug, string? NewName, int? NewModelYear);
 public record CategoryUpsert(Guid BoatId, string Name, int SortOrder, bool IsRequired);
 public record MediaCreateFromUrl(string Url, string? Label);
+public record MediaCreateDto(string Url, string? Label);
 public record OptionGroupUpsert(Guid CategoryId, string Name, string SelectionType, int MinSelect, int MaxSelect, int SortOrder);
 public record OptionUpsert(Guid OptionGroupId, string? Sku, string Label, string? Description, decimal PriceDelta, string? ImageUrl, bool IsDefault, bool IsActive, int SortOrder);
 
