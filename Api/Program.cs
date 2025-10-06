@@ -137,22 +137,6 @@ builder.Services.AddAuthorization(o =>
 
 var app = builder.Build();
 
-// Ensure database is created
-using (var scope = app.Services.CreateScope())
-{
-    var db = scope.ServiceProvider.GetRequiredService<AppDb>();
-    try
-    {
-        Console.WriteLine("Ensuring database is created...");
-        await db.Database.EnsureCreatedAsync();
-        Console.WriteLine("Database creation completed.");
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"Database initialization error: {ex.Message}");
-        Console.WriteLine($"Stack trace: {ex.StackTrace}");
-    }
-}
 
 // Global exception handling
 app.UseExceptionHandler(errorApp =>
@@ -851,10 +835,10 @@ admin.MapPost("/boat", async (BoatUpsert dto, AppDb db) =>
         SideImageUrl = dto.SideImageUrl,
         LogoImageUrl = dto.LogoImageUrl
     };
-    
+
     // Add the boat to the database context
     db.Boats.Add(b);
-    
+
     if (dto.LayerMediaIds is { Count: > 0 })
     {
         var rows = dto.LayerMediaIds.Select((mid, i) => new BoatLayerMedia
@@ -865,10 +849,10 @@ admin.MapPost("/boat", async (BoatUpsert dto, AppDb db) =>
         });
         db.BoatLayerMedias.AddRange(rows);
     }
-    
+
     // Save all changes to the database
     await db.SaveChangesAsync();
-    
+
     return Results.Created($"/admin/boat/{b.Id}", b);
 });
 
