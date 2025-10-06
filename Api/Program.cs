@@ -519,7 +519,7 @@ app.MapPost("/auth/reset-password", async (ResetPasswordRequest req, AppDb db) =
 });
 
 //List active boats
-app.MapGet("/boats", async (AppDb db) =>
+app.MapGet("/boat", async (AppDb db) =>
  Results.Ok(await db.Boats.Where(b => b.IsActive)
  .Select(b => new { b.Slug, b.Name, b.BasePrice })
  .OrderBy(b => b.Name)
@@ -646,7 +646,7 @@ admin.MapPut("/settings/system/timezone", async (SettingDto dto, AppDb db) =>
 });
 
 //Boat config 
-app.MapGet("/boats/{slug}/config", async (string slug, AppDb db) =>
+app.MapGet("/boat/{slug}/config", async (string slug, AppDb db) =>
 {
     var sql = "SELECT * FROM v_boat_config WHERE slug = @slug";
     var param = new NpgsqlParameter("slug", slug);
@@ -821,7 +821,7 @@ admin.MapDelete("/users/{id:guid}", async (Guid id, AppDb db) =>
 
 
 //Boats
-admin.MapGet("/boats", async (HttpRequest req, AppDb db) =>
+admin.MapGet("/boat", async (HttpRequest req, AppDb db) =>
 {
     var search = (req.Query["search"].ToString() ?? "").Trim().ToLowerInvariant();
     var q = db.Boats.AsNoTracking();
@@ -833,7 +833,7 @@ admin.MapGet("/boats", async (HttpRequest req, AppDb db) =>
 });
 
 //Create boat
-admin.MapPost("/boats", async (BoatUpsert dto, AppDb db) =>
+admin.MapPost("/boat", async (BoatUpsert dto, AppDb db) =>
 {
     var b = new Boat
     {
@@ -862,11 +862,11 @@ admin.MapPost("/boats", async (BoatUpsert dto, AppDb db) =>
         db.BoatLayerMedias.AddRange(rows);
         await db.SaveChangesAsync();
     }
-    return Results.Created($"/admin/boats/{b.Id}", b);
+    return Results.Created($"/admin/boat/{b.Id}", b);
 });
 
 //toggle active boat
-admin.MapPost("/boats/{id:guid}/toggle-active", async (Guid id, AppDb db) =>
+admin.MapPost("/boat/{id:guid}/toggle-active", async (Guid id, AppDb db) =>
 {
     var b = await db.Boats.FindAsync(id);
     if (b is null) return Results.NotFound();
@@ -876,7 +876,7 @@ admin.MapPost("/boats/{id:guid}/toggle-active", async (Guid id, AppDb db) =>
 });
 
 //duplicate boat
-admin.MapPost("/boats/{id:guid}/duplicate", async (Guid id, DuplicateBoatDto dto, AppDb db) =>
+admin.MapPost("/boat/{id:guid}/duplicate", async (Guid id, DuplicateBoatDto dto, AppDb db) =>
 {
     var src = await db.Boats.FindAsync(id);
     if (src is null) return Results.NotFound();
@@ -897,11 +897,11 @@ admin.MapPost("/boats/{id:guid}/duplicate", async (Guid id, DuplicateBoatDto dto
 
     db.Boats.Add(copy);
     await db.SaveChangesAsync();
-    return Results.Created($"/admin/boats/{copy.Id}", copy);
+    return Results.Created($"/admin/boat/{copy.Id}", copy);
 });
 
 //Update boat
-admin.MapPatch("/boats/{id:guid}", async (Guid id, BoatUpsert dto, AppDb db) =>
+admin.MapPatch("/boat/{id:guid}", async (Guid id, BoatUpsert dto, AppDb db) =>
 {
     var b = await db.Boats.FindAsync(id);
     if (b is null) return Results.NotFound();
@@ -922,7 +922,7 @@ admin.MapPatch("/boats/{id:guid}", async (Guid id, BoatUpsert dto, AppDb db) =>
 });
 
 //Delete boat
-admin.MapDelete("/boats/{id:guid}", async (Guid id, AppDb db) =>
+admin.MapDelete("/boat/{id:guid}", async (Guid id, AppDb db) =>
 {
     var b = await db.Boats.FindAsync(id);
     if (b is null) return Results.NotFound();
@@ -977,7 +977,7 @@ admin.MapPost("/media/upload", async (HttpRequest req, IWebHostEnvironment env, 
 admin.MapGet("/category", async (AppDb db) =>
     Results.Ok(await db.Categories.OrderBy(c => c.Name).ToListAsync()));
 
-admin.MapGet("/boats/{boatId:guid}/category", async (Guid boatId, AppDb db) =>
+admin.MapGet("/boat/{boatId:guid}/category", async (Guid boatId, AppDb db) =>
     Results.Ok(await db.Categories.Where(c => c.BoatId == boatId).OrderBy(c => c.SortOrder).ToListAsync()));
 
 // Create category
