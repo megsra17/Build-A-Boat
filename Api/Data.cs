@@ -80,13 +80,12 @@ public class AppDb : DbContext
         b.Entity<Boat>().Property(x => x.IsActive).HasColumnName("is_active");
         b.Entity<Boat>().Property(x => x.ModelYear).HasColumnName("model_year");
         b.Entity<Boat>().Property(x => x.HeroImageUrl).HasColumnName("hero_image_url");
-        // TODO: Add features column to database, for now ignore this property
-        b.Entity<Boat>().Ignore(x => x.Features);
-        // TODO: Add these image columns to database, for now ignore these properties
-        b.Entity<Boat>().Ignore(x => x.PrimaryImageUrl);
-        b.Entity<Boat>().Ignore(x => x.SecondaryImageUrl);
-        b.Entity<Boat>().Ignore(x => x.SideImageUrl);
-        b.Entity<Boat>().Ignore(x => x.LogoImageUrl);
+        // Configure the new columns that were added to the database
+        b.Entity<Boat>().Property(x => x.Features).HasColumnName("features");
+        b.Entity<Boat>().Property(x => x.PrimaryImageUrl).HasColumnName("primary_image_url");
+        b.Entity<Boat>().Property(x => x.SecondaryImageUrl).HasColumnName("secondary_image_url");
+        b.Entity<Boat>().Property(x => x.SideImageUrl).HasColumnName("side_image_url");
+        b.Entity<Boat>().Property(x => x.LogoImageUrl).HasColumnName("logo_image_url");
         b.Entity<Category>().ToTable("category");
         b.Entity<OptionGroup>().ToTable("option_group");
         b.Entity<Option>().ToTable("option"); // quoted table in SQL; EF will quote it

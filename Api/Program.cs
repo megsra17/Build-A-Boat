@@ -842,14 +842,14 @@ admin.MapPost("/boats", async (BoatUpsert dto, AppDb db) =>
         Name = dto.Name,
         BasePrice = dto.BasePrice,
         ModelYear = dto.ModelYear,
-        IsActive = true
+        IsActive = true,
 
-        // TODO: Add these columns to database first
-        // Features = dto.Features is null ? null : JsonSerializer.SerializeToNode(dto.Features),
-        // PrimaryImageUrl = dto.PrimaryImageUrl,
-        // SecondaryImageUrl = dto.SecondaryImageUrl,
-        // SideImageUrl = dto.SideImageUrl,
-        // LogoImageUrl = dto.LogoImageUrl
+        // Now that columns exist in database, we can set these properties
+        Features = dto.Features is null ? null : JsonSerializer.SerializeToNode(dto.Features),
+        PrimaryImageUrl = dto.PrimaryImageUrl,
+        SecondaryImageUrl = dto.SecondaryImageUrl,
+        SideImageUrl = dto.SideImageUrl,
+        LogoImageUrl = dto.LogoImageUrl
     };
     if (dto.LayerMediaIds is { Count: > 0 })
     {
@@ -909,6 +909,14 @@ admin.MapPatch("/boats/{id:guid}", async (Guid id, BoatUpsert dto, AppDb db) =>
     b.Name = dto.Name;
     b.BasePrice = dto.BasePrice;
     b.ModelYear = dto.ModelYear;
+
+    // Update the new properties
+    b.Features = dto.Features is null ? null : JsonSerializer.SerializeToNode(dto.Features);
+    b.PrimaryImageUrl = dto.PrimaryImageUrl;
+    b.SecondaryImageUrl = dto.SecondaryImageUrl;
+    b.SideImageUrl = dto.SideImageUrl;
+    b.LogoImageUrl = dto.LogoImageUrl;
+
     await db.SaveChangesAsync();
     return Results.Ok(b);
 });
