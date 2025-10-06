@@ -80,7 +80,8 @@ public class AppDb : DbContext
         b.Entity<Boat>().Property(x => x.IsActive).HasColumnName("is_active");
         b.Entity<Boat>().Property(x => x.ModelYear).HasColumnName("model_year");
         b.Entity<Boat>().Property(x => x.HeroImageUrl).HasColumnName("hero_image_url");
-        b.Entity<Boat>().Property(x => x.Features).HasColumnName("features").HasColumnType("jsonb");
+        // TODO: Add features column to database, for now ignore this property
+        b.Entity<Boat>().Ignore(x => x.Features);
         b.Entity<Boat>().Property(x => x.PrimaryImageUrl).HasColumnName("primary_image_url");
         b.Entity<Boat>().Property(x => x.SecondaryImageUrl).HasColumnName("secondary_image_url");
         b.Entity<Boat>().Property(x => x.SideImageUrl).HasColumnName("side_image_url");
