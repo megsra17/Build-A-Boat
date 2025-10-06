@@ -186,10 +186,11 @@ export default function NewBoatPage() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div>
           <label className="block text-sm text-white/70 mb-2">Model Year</label>
-          <input inputMode="numeric"
-          value={modelYear}
-          onChange={(e) => setModelYear(e.target.value ? Number(e.target.value) : undefined)}
-              className="w-full rounded-md bg-black/40 border border-white/15 px-3 py-2 outline-none"
+          <input 
+            type="number"
+            value={modelYear || ""}
+            onChange={(e) => setModelYear(e.target.value ? Number(e.target.value) : undefined)}
+            className="w-full rounded-md bg-black/40 border border-white/15 px-3 py-2 outline-none"
           />
         </div>
 
@@ -205,8 +206,9 @@ export default function NewBoatPage() {
           <div>
             <label className="block text-sm text-white/70 mb-2">MSRP</label>
             <input
-              inputMode="decimal"
-              value={msrp}
+              type="number"
+              step="0.01"
+              value={msrp || ""}
               onChange={(e) => setMsrp(e.target.value ? Number(e.target.value) : undefined)}
               className="w-full rounded-md bg-black/40 border border-white/15 px-3 py-2 outline-none"
             />
