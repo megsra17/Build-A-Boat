@@ -60,6 +60,14 @@ export type UserRow = {
   updatedAt: string;
 }
 
+export type CategoryRow = {
+  id: string;
+  name: string;
+  slug?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export const SettingsApi = {
   getTimezone: () => authFetch(`${API}/admin/settings/timezone`, {cache: "no-store"}).then(j<{value: string}>).then(r => r.value),
   setTimezone: (value: string) =>
@@ -166,3 +174,32 @@ export const BoatsApi = {
       body:JSON.stringify(body)
     }).then(j<Boat>)
 };
+
+export const CategoriesApi = {
+  async list(apts?: {search?: string}) {
+    const p = new URLSearchParams();
+    if(apts?.search) p.set("search", apts.search);
+    const res = await fetch(`${API}/admin/category?` + p.toString(), {
+      headers: {"Content-Type":"application/json", ...authHeaders()},
+      cache: "no-store",
+    })
+    return j<{items:CategoryRow[]}>(res);
+  },
+
+  async create(body: { name: string;}) {
+    const res = await fetch(`${API}/admin/category`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders()},
+      body: JSON.stringify(body),
+    });
+    return j<CategoryRow>(res);
+  },
+  
+  async remove(id: string){
+    const res = await fetch(`${API}/admin/category/${id}`, { method: "DELETE", headers: { ...authHeaders() } });
+    if(!res.ok) {
+      const text = await res.text();
+      throw new Error(`Failed to delete category: ${res.status} ${text}`);
+    }
+  }
+}
