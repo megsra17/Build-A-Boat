@@ -4,7 +4,10 @@ import React, { useState, useEffect } from "react";
 import {useRouter} from "next/navigation";
 import {Plus, Check} from "lucide-react";
 
-const API = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5199";
+// Use Railway URL for production, localhost for development
+const API = process.env.NODE_ENV === 'production' 
+  ? "https://build-a-boat-production.up.railway.app"
+  : "http://localhost:5001";
 
 type Media = {
   Id: string;
