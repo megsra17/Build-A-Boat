@@ -81,7 +81,9 @@ public class AppDb : DbContext
         b.Entity<Boat>().Property(x => x.ModelYear).HasColumnName("model_year");
         b.Entity<Boat>().Property(x => x.HeroImageUrl).HasColumnName("hero_image_url");
         // Configure the new columns that were added to the database
-        b.Entity<Boat>().Property(x => x.Features).HasColumnName("features");
+        b.Entity<Boat>().Property(x => x.Features)
+            .HasColumnName("features")
+            .HasColumnType("jsonb");
         b.Entity<Boat>().Property(x => x.PrimaryImageUrl).HasColumnName("primary_image_url");
         b.Entity<Boat>().Property(x => x.SecondaryImageUrl).HasColumnName("secondary_image_url");
         b.Entity<Boat>().Property(x => x.SideImageUrl).HasColumnName("side_image_url");
@@ -163,7 +165,7 @@ public class Boat
     public bool IsActive { get; set; } = true;
     public int? ModelYear { get; set; }
     public string? HeroImageUrl { get; set; }
-    public JsonNode? Features { get; set; }
+    public string? Features { get; set; }
     public string? PrimaryImageUrl { get; set; }
     public string? SecondaryImageUrl { get; set; }
     public string? SideImageUrl { get; set; }

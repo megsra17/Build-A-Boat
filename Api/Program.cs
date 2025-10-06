@@ -845,7 +845,7 @@ admin.MapPost("/boats", async (BoatUpsert dto, AppDb db) =>
         IsActive = true,
 
         // Now that columns exist in database, we can set these properties
-        Features = dto.Features is null ? null : JsonSerializer.SerializeToNode(dto.Features),
+        Features = dto.Features is null ? null : JsonSerializer.Serialize(dto.Features),
         PrimaryImageUrl = dto.PrimaryImageUrl,
         SecondaryImageUrl = dto.SecondaryImageUrl,
         SideImageUrl = dto.SideImageUrl,
@@ -911,7 +911,7 @@ admin.MapPatch("/boats/{id:guid}", async (Guid id, BoatUpsert dto, AppDb db) =>
     b.ModelYear = dto.ModelYear;
 
     // Update the new properties
-    b.Features = dto.Features is null ? null : JsonSerializer.SerializeToNode(dto.Features);
+    b.Features = dto.Features is null ? null : JsonSerializer.Serialize(dto.Features);
     b.PrimaryImageUrl = dto.PrimaryImageUrl;
     b.SecondaryImageUrl = dto.SecondaryImageUrl;
     b.SideImageUrl = dto.SideImageUrl;
