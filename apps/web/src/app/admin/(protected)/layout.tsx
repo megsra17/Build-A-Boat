@@ -69,47 +69,48 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               const active = pathname === item.href || (item.href !== "/admin" && pathname?.startsWith(item.href));
               const Icon = item.icon;
               return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`group flex items-center justify-between rounded px-3 py-2 text-sm border
-                    ${active
-                      ? "border-amber-600/50 bg-[#1f1f1f]"
-                      : "border-transparent hover:border-white/10 hover:bg-white/5"}`}
-                >
-                  <span className="flex items-center gap-2">
-                    <Icon className="size-4 opacity-80" />
-                    {item.label}
-                  </span>
-                  {/* tiny right icon spot, matching your screenshot */}
-                  <span className={`size-5 rounded-full border ${active ? "border-amber-600/60" : "border-white/10"} opacity-70`} />
-                </Link>
+                <div key={item.href}>
+                  <Link
+                    href={item.href}
+                    className={`group flex items-center justify-between rounded px-3 py-2 text-sm border
+                      ${active
+                        ? "border-amber-600/50 bg-[#1f1f1f]"
+                        : "border-transparent hover:border-white/10 hover:bg-white/5"}`}
+                  >
+                    <span className="flex items-center gap-2">
+                      <Icon className="size-4 opacity-80" />
+                      {item.label}
+                    </span>
+                    {/* tiny right icon spot, matching your screenshot */}
+                    <span className={`size-5 rounded-full border ${active ? "border-amber-600/60" : "border-white/10"} opacity-70`} />
+                  </Link>
+                  
+                  {/* Show Categories right after Boats */}
+                  {item.href === "/admin/boat" && (pathname === "/admin/boat" || pathname?.startsWith("/admin/boat/") || pathname === "/admin/categories" || pathname?.startsWith("/admin/categories/")) && (() => {
+                    const CategoriesIcon = categoriesNav.icon;
+                    return (
+                      <Link
+                        href={categoriesNav.href}
+                        className={`group flex items-center justify-between rounded px-3 py-2 text-sm border ml-6 mt-1
+                          ${pathname === categoriesNav.href || pathname?.startsWith(categoriesNav.href)
+                            ? "border-amber-600/50 bg-[#1f1f1f]"
+                            : "border-transparent hover:border-white/10 hover:bg-white/5"}`}
+                      >
+                        <span className="flex items-center gap-2">
+                          <CategoriesIcon className="size-4 opacity-80" />
+                          {categoriesNav.label}
+                        </span>
+                        <span className={`size-5 rounded-full border ${
+                          pathname === categoriesNav.href || pathname?.startsWith(categoriesNav.href) 
+                            ? "border-amber-600/60" 
+                            : "border-white/10"
+                        } opacity-70`} />
+                      </Link>
+                    );
+                  })()}
+                </div>
               );
             })}
-            
-            {/* Conditionally show Categories when in boat section */}
-            {(pathname === "/admin/boat" || pathname?.startsWith("/admin/boat/") || pathname === "/admin/categories" || pathname?.startsWith("/admin/categories/")) && (() => {
-              const CategoriesIcon = categoriesNav.icon;
-              return (
-                <Link
-                  href={categoriesNav.href}
-                  className={`group flex items-center justify-between rounded px-3 py-2 text-sm border ml-6
-                    ${pathname === categoriesNav.href || pathname?.startsWith(categoriesNav.href)
-                      ? "border-amber-600/50 bg-[#1f1f1f]"
-                      : "border-transparent hover:border-white/10 hover:bg-white/5"}`}
-                >
-                  <span className="flex items-center gap-2">
-                    <CategoriesIcon className="size-4 opacity-80" />
-                    {categoriesNav.label}
-                  </span>
-                  <span className={`size-5 rounded-full border ${
-                    pathname === categoriesNav.href || pathname?.startsWith(categoriesNav.href) 
-                      ? "border-amber-600/60" 
-                      : "border-white/10"
-                  } opacity-70`} />
-                </Link>
-              );
-            })()}
           </nav>
 
           <div className="p-3 text-xs text-white/40 mt-auto">
