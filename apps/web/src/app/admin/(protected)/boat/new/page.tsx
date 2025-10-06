@@ -126,14 +126,14 @@ export default function NewBoatPage() {
       const body ={
         Slug: nextSlugNumber.toString(),
         Name: name,
+        BasePrice: typeof msrp === "number" ? msrp : Number(msrp || 0),
         ModelYear: typeof modelYear === "number" ? modelYear : Number(modelYear || 0),
-        Categories: selectedCategory ? [selectedCategory] : null,
         Features: features,
         PrimaryImageUrl: primary?.Url ?? null,
         SecondaryImageUrl: secondary?.Url ?? null,
         SideImageUrl: side?.Url ?? null,
         LogoImageUrl: logo?.Url ?? null,
-        BuilderLayers: layers.map(l => l.Id),
+        LayerMediaIds: layers.map(l => l.Id),
       }
 
       const res = await fetch(`${API}/admin/boat`, {
