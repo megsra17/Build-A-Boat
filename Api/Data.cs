@@ -89,6 +89,11 @@ public class AppDb : DbContext
         b.Entity<Boat>().Property(x => x.SideImageUrl).HasColumnName("side_image_url");
         b.Entity<Boat>().Property(x => x.LogoImageUrl).HasColumnName("logo_image_url");
         b.Entity<Category>().ToTable("category");
+        b.Entity<Category>().Property(x => x.Id).HasColumnName("id");
+        b.Entity<Category>().Property(x => x.BoatId).HasColumnName("boat_id");
+        b.Entity<Category>().Property(x => x.Name).HasColumnName("name");
+        b.Entity<Category>().Property(x => x.SortOrder).HasColumnName("sort_order");
+        b.Entity<Category>().Property(x => x.IsRequired).HasColumnName("is_required");
         b.Entity<OptionGroup>().ToTable("option_group");
         b.Entity<Option>().ToTable("option"); // quoted table in SQL; EF will quote it
         b.Entity<ConstraintRule>().ToTable("constraint_rule");
@@ -129,7 +134,7 @@ public class AppDb : DbContext
         b.Entity<BoatConfigRow>().Property(x => x.BoatId).HasColumnName("boat_id");
         b.Entity<BoatConfigRow>().Property(x => x.BasePrice).HasColumnName("base_price");
         b.Entity<BoatConfigRow>().Property(x => x.Categories)
-        .HasColumnName("categories")
+        .HasColumnName("category")
         .HasColumnType("jsonb");
         b.Entity<BoatConfigRow>().Property(x => x.Constraints)
             .HasColumnName("constraints")

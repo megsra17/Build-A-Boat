@@ -974,23 +974,23 @@ admin.MapPost("/media/upload", async (HttpRequest req, IWebHostEnvironment env, 
 });
 
 // Categories
-admin.MapGet("/categories", async (AppDb db) =>
+admin.MapGet("/category", async (AppDb db) =>
     Results.Ok(await db.Categories.OrderBy(c => c.Name).ToListAsync()));
 
-admin.MapGet("/boats/{boatId:guid}/categories", async (Guid boatId, AppDb db) =>
+admin.MapGet("/boats/{boatId:guid}/category", async (Guid boatId, AppDb db) =>
     Results.Ok(await db.Categories.Where(c => c.BoatId == boatId).OrderBy(c => c.SortOrder).ToListAsync()));
 
 // Create category
-admin.MapPost("/categories", async (CategoryUpsert dto, AppDb db) =>
+admin.MapPost("/category", async (CategoryUpsert dto, AppDb db) =>
 {
     var c = new Category { Id = Guid.NewGuid(), BoatId = dto.BoatId, Name = dto.Name, SortOrder = dto.SortOrder, IsRequired = dto.IsRequired };
     db.Categories.Add(c);
     await db.SaveChangesAsync();
-    return Results.Created($"/admin/categories/{c.Id}", c);
+    return Results.Created($"/admin/category/{c.Id}", c);
 });
 
 // Update category
-admin.MapPatch("/categories/{id:guid}", async (Guid id, CategoryUpsert dto, AppDb db) =>
+admin.MapPatch("/category/{id:guid}", async (Guid id, CategoryUpsert dto, AppDb db) =>
 {
     var c = await db.Categories.FindAsync(id);
     if (c is null) return Results.NotFound();
@@ -1003,7 +1003,7 @@ admin.MapPatch("/categories/{id:guid}", async (Guid id, CategoryUpsert dto, AppD
 });
 
 // Delete category
-admin.MapDelete("/categories/{id:guid}", async (Guid id, AppDb db) =>
+admin.MapDelete("/category/{id:guid}", async (Guid id, AppDb db) =>
 {
     var c = await db.Categories.FindAsync(id);
     if (c is null) return Results.NotFound();
@@ -1013,7 +1013,7 @@ admin.MapDelete("/categories/{id:guid}", async (Guid id, AppDb db) =>
 });
 
 // Option groups
-admin.MapGet("/categories/{categoryId:guid}/option-groups", async (Guid categoryId, AppDb db) =>
+admin.MapGet("/category/{categoryId:guid}/option-groups", async (Guid categoryId, AppDb db) =>
     Results.Ok(await db.OptionGroups.Where(g => g.CategoryId == categoryId).OrderBy(g => g.SortOrder).ToListAsync()));
 
 // Create option group
