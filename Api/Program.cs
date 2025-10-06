@@ -819,6 +819,10 @@ admin.MapGet("/boat", async (HttpRequest req, AppDb db) =>
 //Create boat
 admin.MapPost("/boat", async (BoatUpsert dto, AppDb db) =>
 {
+    // Check if slug already exists
+    if (await db.Boats.AnyAsync(b => b.Slug == dto.Slug))
+        return Results.Conflict(new { message = "Boat with same slug already exists" });
+
     var b = new Boat
     {
         Id = Guid.NewGuid(),
