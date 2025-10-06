@@ -105,10 +105,10 @@ export const AdminApi = {
       headers: { "Content-Type": "application/json", ...authHeaders() },
       body: JSON.stringify(body),
     }).then(j),
-  listCategories: (boatId: string) => fetch(`${API}/admin/boats/${boatId}/categories`, { cache: "no-store" }).then(j<Category[]>),
+  listCategories: (boatId: string) => fetch(`${API}/admin/boats/${boatId}/category`, { cache: "no-store" }).then(j<Category[]>),
   upsertCategory: (id: string|undefined, body: Omit<Category,"id">) =>
-    fetch(`${API}/admin/categories${id?"/"+id:""}`, { method: id?"PATCH":"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) }).then(j<Category>),
-  listGroups: (categoryId: string) => fetch(`${API}/admin/categories/${categoryId}/groups`, { cache: "no-store" }).then(j<OptionGroup[]>),
+    fetch(`${API}/admin/category${id?"/"+id:""}`, { method: id?"PATCH":"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) }).then(j<Category>),
+  listGroups: (categoryId: string) => fetch(`${API}/admin/category/${categoryId}/groups`, { cache: "no-store" }).then(j<OptionGroup[]>),
   upsertGroup: (id: string|undefined, body: Omit<OptionGroup,"id">) =>
     fetch(`${API}/admin/option-groups${id?"/"+id:""}`, { method: id?"PATCH":"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) }).then(j<OptionGroup>),
   listOptions: (groupId: string) => fetch(`${API}/admin/groups/${groupId}/options`, { cache: "no-store" }).then(j<OptionItem[]>),

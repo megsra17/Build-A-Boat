@@ -93,7 +93,7 @@ export default function NewBoatPage() {
   (async () => {
     try{
       const jwt = localStorage.getItem("jwt") || sessionStorage.getItem("jwt");
-      const res = await fetch(`${API}/admin/categories`, { headers: jwt ? { Authorization: `Bearer ${jwt}` } : {} });
+      const res = await fetch(`${API}/admin/category`, { headers: jwt ? { Authorization: `Bearer ${jwt}` } : {} });
       if (!res.ok) return;
       setCategories(await res.json());
     }catch{}
