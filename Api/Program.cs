@@ -974,6 +974,9 @@ admin.MapPost("/media/upload", async (HttpRequest req, IWebHostEnvironment env, 
 });
 
 // Categories
+admin.MapGet("/categories", async (AppDb db) =>
+    Results.Ok(await db.Categories.OrderBy(c => c.Name).ToListAsync()));
+
 admin.MapGet("/boats/{boatId:guid}/categories", async (Guid boatId, AppDb db) =>
     Results.Ok(await db.Categories.Where(c => c.BoatId == boatId).OrderBy(c => c.SortOrder).ToListAsync()));
 
