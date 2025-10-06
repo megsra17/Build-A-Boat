@@ -52,7 +52,7 @@ export default function NewBoatPage() {
     (async () => {
       try{
         const jwt = typeof window !== "undefined" ? localStorage.getItem("jwt") || sessionStorage.getItem("jwt") : null;
-        const res = await fetch(`${API}/admin/boats`, {
+        const res = await fetch(`${API}/admin/boat`, {
           headers: jwt ? {Authorization: `Bearer ${jwt}`} : {},
         });
         if(res.ok) {
@@ -136,7 +136,7 @@ export default function NewBoatPage() {
         BuilderLayers: layers.map(l => l.Id),
       }
 
-      const res = await fetch(`${API}/admin/boats`, {
+      const res = await fetch(`${API}/admin/boat`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -151,7 +151,7 @@ export default function NewBoatPage() {
       }
 
       //created go back to list
-      r.push("/admin/boats");
+      r.push("/admin/boat");
     } catch (error) {
       setErr(error instanceof Error ? error.message : String(error));
     } finally {
@@ -334,7 +334,7 @@ export default function NewBoatPage() {
 
       <div className="flex justify-end">
         <button
-          disabled={busy || !name || !modelYear || !msrp}
+          disabled={busy || !name || !modelYear}
           className="inline-flex items-center gap-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-medium px-4 py-2 disabled:opacity-50"
         >
           <Check className="size-4" />

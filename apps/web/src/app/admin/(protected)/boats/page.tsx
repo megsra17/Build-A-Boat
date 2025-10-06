@@ -88,7 +88,7 @@ export default function BoatsPage() {
           />
         </div>
 
-        <Link href="/admin/boats/new" className="inline-flex items-center gap-2 rounded-full border border-amber-600/50 text-amber-400 px-3 py-1.5 hover:bg-amber-500/10">
+        <Link href="/admin/boat/new" className="inline-flex items-center gap-2 rounded-full border border-amber-600/50 text-amber-400 px-3 py-1.5 hover:bg-amber-500/10">
           <Plus className="size-4" /> Add New
         </Link>
       </div>
@@ -119,7 +119,7 @@ export default function BoatsPage() {
                   </div>
                 </td>
                 <td className="px-4 py-3">
-                  <Link href={`/admin/boats/${b.id}`} className="hover:underline">{b.name}</Link>
+                  <Link href={`/admin/boat/${b.id}`} className="hover:underline">{b.name}</Link>
                   <div className="text-white/50 text-xs">{b.slug}</div>
                 </td>
                 <td className="px-4 py-3">

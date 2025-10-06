@@ -98,14 +98,14 @@ export const UsersApi = {
 
 export const AdminApi = {
   listBoats: () =>
-    fetch(`${API}/admin/boats`, { cache: "no-store", headers: { ...authHeaders() } }).then(j),
+    fetch(`${API}/admin/boat`, { cache: "no-store", headers: { ...authHeaders() } }).then(j),
   upsertBoat: (id: string | undefined, body: Omit<Boat, 'id'>) =>
-    fetch(`${API}/admin/boats${id ? "/" + id : ""}`, {
+    fetch(`${API}/admin/boat${id ? "/" + id : ""}`, {
       method: id ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json", ...authHeaders() },
       body: JSON.stringify(body),
     }).then(j),
-  listCategories: (boatId: string) => fetch(`${API}/admin/boats/${boatId}/category`, { cache: "no-store" }).then(j<Category[]>),
+  listCategories: (boatId: string) => fetch(`${API}/admin/boat/${boatId}/category`, { cache: "no-store" }).then(j<Category[]>),
   upsertCategory: (id: string|undefined, body: Omit<Category,"id">) =>
     fetch(`${API}/admin/category${id?"/"+id:""}`, { method: id?"PATCH":"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) }).then(j<Category>),
   listGroups: (categoryId: string) => fetch(`${API}/admin/category/${categoryId}/groups`, { cache: "no-store" }).then(j<OptionGroup[]>),
@@ -136,31 +136,31 @@ export const RolesApi = {
 export const BoatsApi = {
   list: (search?: string) => {
     const qs = search ? `?search=${encodeURIComponent(search)}` : "";
-    return authFetch(`${API}/admin/boats${qs}`, { cache:"no-store" })
+    return authFetch(`${API}/admin/boat${qs}`, { cache:"no-store" })
       .then(j<{items:Boat[]}>);
   },
   create: (b: {slug:string; name:string; basePrice:number; modelYear?:number|null}) =>
-    authFetch(`${API}/admin/boats`, {
+    authFetch(`${API}/admin/boat`, {
       method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify(b)
     }).then(j<Boat>),
   update: (id:string, b: Partial<Pick<Boat,"slug"|"name"|"basePrice"|"modelYear"|"heroImageUrl">>) =>
-    authFetch(`${API}/admin/boats/${id}`, {
+    authFetch(`${API}/admin/boat/${id}`, {
       method:"PATCH",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify(b)
     }).then(j<Boat>),
   remove: (id:string) =>
-    authFetch(`${API}/admin/boats/${id}`, { method:"DELETE" })
+    authFetch(`${API}/admin/boat/${id}`, { method:"DELETE" })
       .then(async r => { if(!r.ok) throw new Error(await r.text()); }),
 
   toggleActive: (id:string) =>
-    authFetch(`${API}/admin/boats/${id}/toggle-active`, { method:"POST" })
+    authFetch(`${API}/admin/boat/${id}/toggle-active`, { method:"POST" })
       .then(j<{id:string; isActive:boolean}>),
 
   duplicate: (id:string, body:{ newSlug:string; newName?:string; newModelYear?:number }) =>
-    authFetch(`${API}/admin/boats/${id}/duplicate`, {
+    authFetch(`${API}/admin/boat/${id}/duplicate`, {
       method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify(body)

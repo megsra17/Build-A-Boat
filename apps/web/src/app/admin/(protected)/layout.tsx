@@ -10,7 +10,7 @@ const nav = [
   { href: "/admin", label: "Dashboard", icon: Gauge },
   { href: "/admin/users", label: "Users", icon: Users },
   { href: "/admin/roles", label: "Roles", icon: Shield },
-  { href: "/admin/boats", label: "Boats", icon: Ship },
+  { href: "/admin/boat", label: "Boats", icon: Ship },
   { href: "/admin/settings", label: "Settings", icon: Cog },
 ];
 
