@@ -842,14 +842,14 @@ admin.MapPost("/boats", async (BoatUpsert dto, AppDb db) =>
         Name = dto.Name,
         BasePrice = dto.BasePrice,
         ModelYear = dto.ModelYear,
-        IsActive = true,
+        IsActive = true
 
-        // New columns (add to your Boat entity)
-        Features = dto.Features is null ? null : JsonSerializer.SerializeToNode(dto.Features),
-        PrimaryImageUrl = dto.PrimaryImageUrl,
-        SecondaryImageUrl = dto.SecondaryImageUrl,
-        SideImageUrl = dto.SideImageUrl,
-        LogoImageUrl = dto.LogoImageUrl
+        // TODO: Add these columns to database first
+        // Features = dto.Features is null ? null : JsonSerializer.SerializeToNode(dto.Features),
+        // PrimaryImageUrl = dto.PrimaryImageUrl,
+        // SecondaryImageUrl = dto.SecondaryImageUrl,
+        // SideImageUrl = dto.SideImageUrl,
+        // LogoImageUrl = dto.LogoImageUrl
     };
     if (dto.LayerMediaIds is { Count: > 0 })
     {
