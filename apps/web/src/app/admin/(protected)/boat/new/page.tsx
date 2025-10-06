@@ -52,24 +52,19 @@ export default function NewBoatPage() {
     (async () => {
       try{
         const jwt = typeof window !== "undefined" ? localStorage.getItem("jwt") || sessionStorage.getItem("jwt") : null;
-        console.log("Fetching boats for slug generation, JWT present:", jwt ? "yes" : "no");
         
         const res = await fetch(`${API}/admin/boat`, {
           headers: jwt ? {Authorization: `Bearer ${jwt}`} : {},
         });
         
-        console.log("Boats fetch response status:", res.status);
-        
         if(res.ok) {
           const data = await res.json();
-          console.log("Boats API response:", data);
           const boats = data.items || data || [];
           // Find the highest numeric slug and add 1
           const maxSlug = boats.reduce((max: number, boat: {slug?: string}) => {
             const slugNum = parseInt(boat.slug || "0");
             return isNaN(slugNum) ? max : Math.max(max, slugNum);
           }, -1);
-          console.log("Next slug number:", maxSlug + 1);
           setNextSlugNumber(maxSlug + 1);
         } else {
           console.error("Failed to fetch boats:", res.status);
@@ -147,9 +142,6 @@ export default function NewBoatPage() {
         LayerMediaIds: layers.map(l => l.Id),
       }
 
-      console.log("Submitting boat with body:", body);
-      console.log("JWT token present:", jwt ? "yes" : "no");
-
       const res = await fetch(`${API}/admin/boat`, {
         method: "POST",
         headers: {
@@ -159,16 +151,12 @@ export default function NewBoatPage() {
         body: JSON.stringify(body),
       });
 
-      console.log("Create boat response status:", res.status);
-
       if(!res.ok) {
         const text = await res.text();
         console.error("Create boat error response:", text);
         throw new Error(`Failed to create boat: ${res.status} ${text}`);
       }
-
       const result = await res.json();
-      console.log("Create boat success response:", result);
 
       //created go back to list
       r.push("/admin/boat");
