@@ -851,6 +851,10 @@ admin.MapPost("/boat", async (BoatUpsert dto, AppDb db) =>
         SideImageUrl = dto.SideImageUrl,
         LogoImageUrl = dto.LogoImageUrl
     };
+    
+    // Add the boat to the database context
+    db.Boats.Add(b);
+    
     if (dto.LayerMediaIds is { Count: > 0 })
     {
         var rows = dto.LayerMediaIds.Select((mid, i) => new BoatLayerMedia
@@ -860,8 +864,11 @@ admin.MapPost("/boat", async (BoatUpsert dto, AppDb db) =>
             SortOrder = i
         });
         db.BoatLayerMedias.AddRange(rows);
-        await db.SaveChangesAsync();
     }
+    
+    // Save all changes to the database
+    await db.SaveChangesAsync();
+    
     return Results.Created($"/admin/boat/{b.Id}", b);
 });
 
