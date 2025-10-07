@@ -115,9 +115,9 @@ export default function BoatsPage() {
           </thead>
           <tbody>
             {rows.map((b, i) => (
-              <tr key={b.id} className={`${i%2===0?"bg-white/[0.02]":""} border-b border-white/5`}>
+              <tr key={b.id} className={`${i%2===0?"bg-white/[0.02]":""} border-b border-white/5 hover:bg-white/5 transition-colors`}>
                 <td className="px-4 py-3">
-                  <div className="flex items-center gap-2">
+                  <Link href={`/admin/boat/${b.id}`} className="flex items-center gap-2 block">
                     <div className="size-8 rounded bg-black/50 border border-white/10 overflow-hidden">
                       {b.heroImageUrl ? (
                         <Image src={b.heroImageUrl} alt="" width={32} height={32} className="w-8 h-8 object-cover" />
@@ -126,18 +126,22 @@ export default function BoatsPage() {
                       )}
                     </div>
                     <span className="font-mono">{b.modelYear ?? "-"}</span>
-                  </div>
+                  </Link>
                 </td>
                 <td className="px-4 py-3">
-                  <Link href={`/admin/boat/${b.id}`} className="hover:underline">{b.name}</Link>
-                  <div className="text-white/50 text-xs">{b.slug}</div>
+                  <Link href={`/admin/boat/${b.id}`} className="block hover:underline">
+                    <div>{b.name}</div>
+                    <div className="text-white/50 text-xs">{b.slug}</div>
+                  </Link>
                 </td>
                 <td className="px-4 py-3">
-                  {b.isActive ? (
-                    <span className="inline-flex items-center rounded-full bg-emerald-600/20 text-emerald-300 px-2 py-0.5 text-xs">Active</span>
-                  ) : (
-                    <span className="inline-flex items-center rounded-full bg-white/10 text-white/70 px-2 py-0.5 text-xs">Inactive</span>
-                  )}
+                  <Link href={`/admin/boat/${b.id}`} className="block">
+                    {b.isActive ? (
+                      <span className="inline-flex items-center rounded-full bg-emerald-600/20 text-emerald-300 px-2 py-0.5 text-xs">Active</span>
+                    ) : (
+                      <span className="inline-flex items-center rounded-full bg-white/10 text-white/70 px-2 py-0.5 text-xs">Inactive</span>
+                    )}
+                  </Link>
                 </td>
                 <td className="px-2 py-3 text-right">
                   <div className="inline-flex items-center gap-2">
@@ -145,25 +149,26 @@ export default function BoatsPage() {
                       href={`/admin/boat/${b.id}`}
                       title="Edit"
                       className="p-1.5 rounded-full border border-white/15 hover:bg-white/10"
+                      onClick={(e) => e.stopPropagation()}
                     >
                       <Edit className="size-4" />
                     </Link>
                     <button
-                      onClick={() => toggleActive(b.id)}
+                      onClick={(e) => { e.stopPropagation(); toggleActive(b.id); }}
                       title="Toggle active"
                       className="p-1.5 rounded-full border border-white/15 hover:bg-white/10"
                     >
                       <RefreshCw className="size-4" />
                     </button>
                     <button
-                      onClick={() => openDup(b)}
+                      onClick={(e) => { e.stopPropagation(); openDup(b); }}
                       title="Duplicate"
                       className="p-1.5 rounded-full border border-white/15 hover:bg-white/10"
                     >
                       <Copy className="size-4" />
                     </button>
                     <button
-                      onClick={() => deleteBoat(b.id)}
+                      onClick={(e) => { e.stopPropagation(); deleteBoat(b.id); }}
                       title="Delete"
                       className="p-1.5 rounded-full border border-white/15 hover:bg-white/10"
                     >
