@@ -16,8 +16,6 @@ export default function CategoriesPage() {
   const [search, setSearch] = useState("");
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState("");
-  const [sortOrder, setSortOrder] = useState(0);
-  const [isRequired, setIsRequired] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   async function load() {
@@ -59,14 +57,10 @@ export default function CategoriesPage() {
       
       const created = await CategoriesApi.create({ 
         Name: newName.trim(),
-        BoatId: defaultBoatId,
-        SortOrder: sortOrder,
-        IsRequired: isRequired
+        BoatId: defaultBoatId
       });
       setRows((r) => [created, ...r]);
       setNewName("");
-      setSortOrder(0);
-      setIsRequired(false);
       setAdding(false);
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
@@ -132,37 +126,11 @@ export default function CategoriesPage() {
               />
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm text-white/70 mb-2">Sort Order</label>
-                <input
-                  type="number"
-                  value={sortOrder}
-                  onChange={(e) => setSortOrder(Number(e.target.value))}
-                  className="w-full bg-[#151515] border border-white/10 rounded px-3 py-2 outline-none focus:ring-2 focus:ring-white/10"
-                />
-              </div>
-              <div className="flex items-center space-x-2 pt-6">
-                <input
-                  type="checkbox"
-                  id="isRequired"
-                  checked={isRequired}
-                  onChange={(e) => setIsRequired(e.target.checked)}
-                  className="rounded border-white/10 bg-[#151515]"
-                />
-                <label htmlFor="isRequired" className="text-sm text-white/70">
-                  Required category
-                </label>
-              </div>
-            </div>
-            
             <div className="flex items-center gap-2 pt-2">
               <button
                 onClick={() => {
                   setAdding(false);
                   setNewName("");
-                  setSortOrder(0);
-                  setIsRequired(false);
                 }}
                 className="px-4 py-2 rounded border border-white/15 hover:bg-white/10"
               >
