@@ -1,343 +1,451 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
-import { useParams } from "next/navigation";
-import { BoatsApi, type BoatSummary, type BoatConfigNode } from "@/app/lib/admin-api";
-import { Plus, Pencil, Trash2, ChevronDown, ChevronRight, ArrowUp, ArrowDown } from "lucide-react";
+import { Save, ArrowLeft, Trash2 } from "lucide-react";
 
-// small icon button
-function IconBtn({ title, onClick, children }: { title: string; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      title={title}
-      onClick={onClick}
-      className="inline-flex items-center justify-center size-7 rounded-full border border-white/15 hover:bg-white/10 text-white/80"
-    >
-      {children}
-    </button>
-  );
-}
+type Boat = {
+  id: string;
+  slug: string;
+  name: string;
+  basePrice: number;
+  isActive: boolean;
+  modelYear?: number | null;
+  heroImageUrl?: string | null;
+  features?: string | null;
+  primaryImageUrl?: string | null;
+  secondaryImageUrl?: string | null;
+  sideImageUrl?: string | null;
+  logoImageUrl?: string | null;
+};
 
-// ----- immutable tree utilities -----
-function insertChild(tree: BoatConfigNode[], parentId: string, child: BoatConfigNode): BoatConfigNode[] {
-  return tree.map(n => {
-    if (n.id === parentId) {
-      const kids = n.children ? [child, ...n.children] : [child];
-      return { ...n, children: kids };
-    }
-    if (n.children) return { ...n, children: insertChild(n.children, parentId, child) };
-    return n;
-  });
-}
-function replaceNode(tree: BoatConfigNode[], updated: BoatConfigNode): BoatConfigNode[] {
-  return tree.map(n => {
-    if (n.id === updated.id) return { ...n, name: updated.name, children: updated.children ?? n.children };
-    if (n.children) return { ...n, children: replaceNode(n.children, updated) };
-    return n;
-  });
-}
-function deleteNode(tree: BoatConfigNode[], id: string): BoatConfigNode[] {
-  return tree
-    .filter(n => n.id !== id)
-    .map(n => (n.children ? { ...n, children: deleteNode(n.children, id) } : n));
-}
-
-type Expanded = Record<string, boolean>;
-
-export default function BoatEditorPage() {
+export default function BoatEditPage() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
   const boatId = params?.id as string;
 
-  const [busy, setBusy] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [boat, setBoat] = useState<BoatSummary | null>(null);
-  const [tree, setTree] = useState<BoatConfigNode[]>([]);
-  const [expanded, setExpanded] = useState<Expanded>({});
-  const [err, setErr] = useState<string | null>(null);
+  const [boat, setBoat] = useState<Boat | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [formData, setFormData] = useState<Partial<Boat>>({});
+
+  // Get API base URL
+  const getApiBase = () => {
+    if (process.env.NODE_ENV === 'production') {
+      return 'https://build-a-boat-production.up.railway.app';
+    }
+    return 'http://localhost:5199';
+  };
 
   useEffect(() => {
     let mounted = true;
-    (async () => {
-      setBusy(true);
-      setErr(null);
+    
+    const fetchBoat = async () => {
+      if (!boatId) return;
+      
+      setLoading(true);
+      setError(null);
+      
       try {
-        const res = await BoatsApi.get(boatId);
-        if (!mounted) return;
-        setBoat(res.boat);
-        setTree(res.tree ?? []);
-        // expand top level groups by default
-        const exp: Expanded = {};
-        for (const g of res.tree ?? []) exp[g.id] = true;
-        setExpanded(exp);
-      } catch (e) {
-        setErr(e instanceof Error ? e.message : String(e));
+        const apiBase = getApiBase();
+        console.log('Fetching boat from:', `${apiBase}/admin/boat/${boatId}`);
+        
+        const response = await fetch(`${apiBase}/admin/boat/${boatId}`);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch boat: ${response.status} ${response.statusText}`);
+        }
+        const boatData = await response.json();
+        
+        console.log('Boat data received:', boatData);
+        
+        if (mounted) {
+          setBoat(boatData);
+          setFormData({
+            name: boatData.name,
+            slug: boatData.slug,
+            basePrice: boatData.basePrice,
+            modelYear: boatData.modelYear,
+            heroImageUrl: boatData.heroImageUrl,
+            features: boatData.features,
+            primaryImageUrl: boatData.primaryImageUrl,
+            secondaryImageUrl: boatData.secondaryImageUrl,
+            sideImageUrl: boatData.sideImageUrl,
+            logoImageUrl: boatData.logoImageUrl,
+          });
+        }
+      } catch (err) {
+        console.error('Error fetching boat:', err);
+        if (mounted) {
+          setError(err instanceof Error ? err.message : 'Failed to load boat');
+        }
       } finally {
-        if (mounted) setBusy(false);
+        if (mounted) {
+          setLoading(false);
+        }
       }
-    })();
-    return () => { mounted = false; };
+    };
+
+    fetchBoat();
+    
+    return () => {
+      mounted = false;
+    };
   }, [boatId]);
 
-  // --- summary editing helpers ---
-  async function saveSummary(patch: Partial<BoatSummary>) {
-    if (!boat) return;
+  const handleSave = async () => {
+    if (!boat || !formData) return;
+    
     setSaving(true);
-    setBoat({ ...boat, ...patch }); // optimistic
+    setError(null);
+    
     try {
-      const updated = await BoatsApi.updateSummary(boatId, patch);
-      setBoat(updated);
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
+      const apiBase = getApiBase();
+      
+      const response = await fetch(`${apiBase}/admin/boat/${boatId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to update boat: ${response.status} ${response.statusText}`);
+      }
+      
+      const updatedBoat = await response.json();
+      setBoat(updatedBoat);
+      
+      // Show success message
+      alert('Boat updated successfully!');
+      
+    } catch (err) {
+      console.error('Error updating boat:', err);
+      setError(err instanceof Error ? err.message : 'Failed to update boat');
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleDelete = async () => {
+    if (!boat) return;
+    
+    if (!confirm(`Are you sure you want to delete "${boat.name}"? This action cannot be undone.`)) {
+      return;
+    }
+    
+    try {
+      const apiBase = getApiBase();
+      
+      const response = await fetch(`${apiBase}/admin/boat/${boatId}`, {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to delete boat: ${response.status} ${response.statusText}`);
+      }
+      
+      alert('Boat deleted successfully!');
+      router.push('/admin/boat');
+      
+    } catch (err) {
+      console.error('Error deleting boat:', err);
+      setError(err instanceof Error ? err.message : 'Failed to delete boat');
+    }
+  };
+
+  const updateFormData = (field: keyof Boat, value: string | number | null) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-white/70">Loading boat details...</div>
+      </div>
+    );
   }
 
-  // ---- tree helpers ----
-  function toggle(id: string) {
-    setExpanded((m) => ({ ...m, [id]: !m[id] }));
-  }
-  async function addGroup() {
-    const name = prompt("New group name");
-    if (!name) return;
-    const created = await BoatsApi.addNode(boatId, null, "group", name);
-    setTree((t) => [created, ...t]);
-    setExpanded((m) => ({ ...m, [created.id]: true }));
-  }
-  async function addChild(parentId: string, type: BoatConfigNode["type"]) {
-    const name = prompt(`New ${type} name`);
-    if (!name) return;
-    const created = await BoatsApi.addNode(boatId, parentId, type, name);
-    // insert into tree
-    setTree((prev) => insertChild(prev, parentId, created));
-  }
-  async function rename(nodeId: string, current: string) {
-    const name = prompt("Rename", current);
-    if (!name || name === current) return;
-    const updated = await BoatsApi.renameNode(boatId, nodeId, name);
-    setTree((prev) => replaceNode(prev, updated));
-  }
-  async function remove(nodeId: string) {
-    if (!confirm("Delete this item (and all children)?")) return;
-    const snapshot = tree;
-    setTree((prev) => deleteNode(prev, nodeId));
-    try {
-      await BoatsApi.deleteNode(boatId, nodeId);
-    } catch (e) {
-      setTree(snapshot); // rollback
-      alert(e instanceof Error ? e.message : String(e));
-    }
-  }
-  async function move(nodeId: string, dir: "up" | "down") {
-    try {
-      const res = await BoatsApi.moveNode(boatId, nodeId, dir);
-      setTree(res.tree);
-    } catch (e) {
-      alert(e instanceof Error ? e.message : String(e));
-    }
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-red-400">Error: {error}</div>
+      </div>
+    );
   }
 
-  if (busy) return <div className="text-white/70">Loading…</div>;
-  if (err) return <div className="text-red-400">{err}</div>;
-  if (!boat) return null;
+  if (!boat) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-white/70">Boat not found</div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      {/* Summary card */}
-      <section className="rounded-lg border border-white/10 bg-[#1f1f1f] p-4">
-        <div className="flex items-start gap-6">
-          <div className="w-[280px] h-[170px] relative rounded-md overflow-hidden bg-black/40 border border-white/10">
-            {boat.heroUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={boat.heroUrl} alt="" className="w-full h-full object-cover" />
-            ) : (
-              <div className="w-full h-full grid place-items-center text-white/40">No Image</div>
-            )}
-          </div>
-
-          <div className="grid grid-cols-2 gap-x-10 gap-y-2 text-sm">
-            <LabelValue label="Model Year" value={boat.modelYear} onEdit={(v)=> saveSummary({ modelYear: Number(v) })}/>
-            <LabelValue label="Name" value={boat.name} onEdit={(v)=> saveSummary({ name: v })}/>
-            <LabelValue label="Category" value={boat.category} onEdit={(v)=> saveSummary({ category: v })}/>
-            <LabelValue label="MSRP" value={boat.msrp ?? ""} onEdit={(v)=> saveSummary({ msrp: Number(v) })}/>
-            <LabelValue label="Features" value={boat.features ?? ""} long onEdit={(v)=> saveSummary({ features: v })}/>
-            <LabelValue label="Start Build Link" value={boat.startBuildUrl ?? ""} long onEdit={(v)=> saveSummary({ startBuildUrl: v })}/>
-          </div>
-
-          <div className="ml-auto text-white/60 text-sm">{saving ? "Saving…" : null}</div>
-        </div>
-      </section>
-
-      {/* Configurations */}
-      <section className="rounded-lg border border-white/10">
-        <div className="px-4 py-3 border-b border-white/10 bg-[#1b1b1b] flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-white/90 font-medium">Configurations</span>
-          </div>
-          <button onClick={addGroup} className="rounded-full border border-amber-500/40 text-amber-300 hover:bg-amber-500/10 px-3 py-1 text-sm">
-            Add Group
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => router.push('/admin/boat')}
+            className="flex items-center gap-2 text-white/70 hover:text-white transition-colors"
+          >
+            <ArrowLeft className="size-4" />
+            Back to Boats
           </button>
+          <h1 className="text-2xl font-bold text-white">Edit Boat: {boat.name}</h1>
         </div>
-
-        <div className="p-3">
-          {tree.length === 0 && <div className="text-white/60 text-sm">No groups yet.</div>}
-          <ul className="space-y-3">
-            {tree.map((g, i) => (
-              <NodeRow
-                key={g.id}
-                node={g}
-                depth={0}
-                expanded={!!expanded[g.id]}
-                onToggle={() => toggle(g.id)}
-                onAddChild={(t) => addChild(g.id, t)}
-                onRename={(name) => rename(g.id, name)}
-                onDelete={() => remove(g.id)}
-                onMoveUp={() => move(g.id, "up")}
-                onMoveDown={() => move(g.id, "down")}
-                renderChildren={(children) =>
-                  children?.map((c) => (
-                    <NodeRecursive
-                      key={c.id}
-                      node={c}
-                      depth={1}
-                      expanded={expanded}
-                      toggle={toggle}
-                      addChild={addChild}
-                      rename={rename}
-                      remove={remove}
-                      move={move}
-                    />
-                  ))
-                }
-              />
-            ))}
-          </ul>
-        </div>
-      </section>
-    </div>
-  );
-}
-
-// ---------- helpers / components ----------
-
-function LabelValue({
-  label, value, long, onEdit
-}: { label: string; value: any; long?: boolean; onEdit: (next: string)=>void }) {
-  return (
-    <div className={`col-span-${long ? "2" : "1"}`}>
-      <div className="text-white/60">{label}:</div>
-      <div className="flex items-center gap-2">
-        <div className="whitespace-pre-wrap">{String(value ?? "").trim() || "—"}</div>
-        <IconBtn title="Edit" onClick={() => {
-          const v = prompt(`Edit ${label}`, String(value ?? ""));
-          if (v !== null) onEdit(v);
-        }}>
-          <Pencil className="size-4" />
-        </IconBtn>
-      </div>
-    </div>
-  );
-}
-
-function NodeRecursive({
-  node, depth, expanded, toggle, addChild, rename, remove, move
-}: {
-  node: BoatConfigNode; depth: number; expanded: Expanded;
-  toggle: (id: string)=> void;
-  addChild: (parentId: string, type: BoatConfigNode["type"]) => void;
-  rename: (nodeId: string, current: string) => void;
-  remove: (nodeId: string)=> void;
-  move: (nodeId: string, dir:"up"|"down")=> void;
-}) {
-  return (
-    <NodeRow
-      node={node}
-      depth={depth}
-      expanded={!!expanded[node.id]}
-      onToggle={() => toggle(node.id)}
-      onAddChild={(t)=> addChild(node.id, t)}
-      onRename={(name)=> rename(node.id, name)}
-      onDelete={()=> remove(node.id)}
-      onMoveUp={()=> move(node.id, "up")}
-      onMoveDown={()=> move(node.id, "down")}
-      renderChildren={(children)=>
-        children?.map((ch)=>(
-          <NodeRecursive
-            key={ch.id}
-            node={ch}
-            depth={depth+1}
-            expanded={expanded}
-            toggle={toggle}
-            addChild={addChild}
-            rename={rename}
-            remove={remove}
-            move={move}
-          />
-        ))
-      }
-    />
-  );
-}
-
-function NodeRow({
-  node, depth, expanded, onToggle, onAddChild, onRename, onDelete, onMoveUp, onMoveDown, renderChildren
-}: {
-  node: BoatConfigNode;
-  depth: number;
-  expanded: boolean;
-  onToggle: ()=>void;
-  onAddChild: (t: BoatConfigNode["type"])=>void;
-  onRename: (current: string)=>void;
-  onDelete: ()=>void;
-  onMoveUp: ()=>void;
-  onMoveDown: ()=>void;
-  renderChildren: (children?: BoatConfigNode[]) => React.ReactNode;
-}) {
-  const canHaveChildren = node.type !== "option";
-  const pad = 8 + depth * 20;
-
-  return (
-    <li className="rounded border border-white/10">
-      <div className="flex items-center gap-2 px-3 py-2" style={{ paddingLeft: pad }}>
-        {/* chevron */}
-        {canHaveChildren ? (
-          <button onClick={onToggle} className="text-white/70 hover:text-white">
-            {expanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+        
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleDelete}
+            className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+          >
+            <Trash2 className="size-4" />
+            Delete
           </button>
-        ) : (
-          <div className="size-4" />
-        )}
-
-        <div className="font-medium">
-          {node.name}
-        </div>
-
-        <div className="ml-auto flex items-center gap-1">
-          {/* move */}
-          <IconBtn title="Move up" onClick={onMoveUp}><ArrowUp className="size-4" /></IconBtn>
-          <IconBtn title="Move down" onClick={onMoveDown}><ArrowDown className="size-4" /></IconBtn>
-
-          {/* add children */}
-          {canHaveChildren && (
-            <>
-              <IconBtn title="Add category" onClick={()=> onAddChild("category")}><Plus className="size-4" /></IconBtn>
-              <IconBtn title="Add option" onClick={()=> onAddChild("option")}><Plus className="size-4" /></IconBtn>
-            </>
-          )}
-
-          {/* rename/delete */}
-          <IconBtn title="Rename" onClick={()=> onRename(node.name)}><Pencil className="size-4" /></IconBtn>
-          <IconBtn title="Delete" onClick={onDelete}><Trash2 className="size-4" /></IconBtn>
+          
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 text-white rounded-lg transition-colors"
+          >
+            <Save className="size-4" />
+            {saving ? 'Saving...' : 'Save Changes'}
+          </button>
         </div>
       </div>
 
-      {/* children */}
-      {expanded && canHaveChildren && node.children && node.children.length > 0 && (
-        <ul className="px-2 pb-2 space-y-2">
-          {renderChildren(node.children)}
-        </ul>
+      {error && (
+        <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4">
+          <div className="text-red-400">{error}</div>
+        </div>
       )}
-    </li>
+
+      {/* Basic Information */}
+      <section className="rounded-lg border border-white/10 bg-[#1f1f1f] p-6">
+        <h2 className="text-lg font-semibold text-white mb-4">Basic Information</h2>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-white/70 mb-2">Name</label>
+              <input
+                type="text"
+                value={formData.name || ''}
+                onChange={(e) => updateFormData('name', e.target.value)}
+                className="w-full px-3 py-2 bg-black/20 border border-white/10 rounded-lg text-white placeholder-white/40 focus:border-blue-500 focus:outline-none"
+                placeholder="Enter boat name"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-white/70 mb-2">Slug</label>
+              <input
+                type="text"
+                value={formData.slug || ''}
+                onChange={(e) => updateFormData('slug', e.target.value)}
+                className="w-full px-3 py-2 bg-black/20 border border-white/10 rounded-lg text-white placeholder-white/40 focus:border-blue-500 focus:outline-none font-mono text-sm"
+                placeholder="boat-slug"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-white/70 mb-2">Base Price</label>
+              <input
+                type="number"
+                value={formData.basePrice || ''}
+                onChange={(e) => updateFormData('basePrice', parseFloat(e.target.value) || 0)}
+                className="w-full px-3 py-2 bg-black/20 border border-white/10 rounded-lg text-white placeholder-white/40 focus:border-blue-500 focus:outline-none"
+                placeholder="0"
+                min="0"
+                step="0.01"
+              />
+            </div>
+          </div>
+          
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-white/70 mb-2">Model Year</label>
+              <input
+                type="number"
+                value={formData.modelYear || ''}
+                onChange={(e) => updateFormData('modelYear', parseInt(e.target.value) || null)}
+                className="w-full px-3 py-2 bg-black/20 border border-white/10 rounded-lg text-white placeholder-white/40 focus:border-blue-500 focus:outline-none"
+                placeholder="2024"
+                min="1900"
+                max="2050"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-white/70 mb-2">Status</label>
+              <div className={`inline-flex px-3 py-2 rounded-lg text-sm font-medium ${
+                boat.isActive 
+                  ? 'bg-green-500/20 text-green-400' 
+                  : 'bg-red-500/20 text-red-400'
+              }`}>
+                {boat.isActive ? 'Active' : 'Inactive'}
+              </div>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-white/70 mb-2">ID</label>
+              <div className="text-white/60 font-mono text-xs bg-black/20 px-3 py-2 rounded-lg">
+                {boat.id}
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div className="mt-6">
+          <label className="block text-sm font-medium text-white/70 mb-2">Features</label>
+          <textarea
+            value={formData.features || ''}
+            onChange={(e) => updateFormData('features', e.target.value)}
+            className="w-full px-3 py-2 bg-black/20 border border-white/10 rounded-lg text-white placeholder-white/40 focus:border-blue-500 focus:outline-none"
+            placeholder="Enter boat features (JSON format or text)"
+            rows={3}
+          />
+        </div>
+      </section>
+
+      {/* Images */}
+      <section className="rounded-lg border border-white/10 bg-[#1f1f1f] p-6">
+        <h2 className="text-lg font-semibold text-white mb-4">Images</h2>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-white/70 mb-2">Hero Image URL</label>
+              <input
+                type="url"
+                value={formData.heroImageUrl || ''}
+                onChange={(e) => updateFormData('heroImageUrl', e.target.value)}
+                className="w-full px-3 py-2 bg-black/20 border border-white/10 rounded-lg text-white placeholder-white/40 focus:border-blue-500 focus:outline-none"
+                placeholder="https://example.com/hero.jpg"
+              />
+              {formData.heroImageUrl && (
+                <div className="mt-2 w-full h-32 relative rounded-lg overflow-hidden bg-black/40 border border-white/10">
+                  <img 
+                    src={formData.heroImageUrl} 
+                    alt="Hero preview"
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = 'none';
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-white/70 mb-2">Primary Image URL</label>
+              <input
+                type="url"
+                value={formData.primaryImageUrl || ''}
+                onChange={(e) => updateFormData('primaryImageUrl', e.target.value)}
+                className="w-full px-3 py-2 bg-black/20 border border-white/10 rounded-lg text-white placeholder-white/40 focus:border-blue-500 focus:outline-none"
+                placeholder="https://example.com/primary.jpg"
+              />
+              {formData.primaryImageUrl && (
+                <div className="mt-2 w-full h-32 relative rounded-lg overflow-hidden bg-black/40 border border-white/10">
+                  <img 
+                    src={formData.primaryImageUrl} 
+                    alt="Primary preview"
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = 'none';
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-white/70 mb-2">Secondary Image URL</label>
+              <input
+                type="url"
+                value={formData.secondaryImageUrl || ''}
+                onChange={(e) => updateFormData('secondaryImageUrl', e.target.value)}
+                className="w-full px-3 py-2 bg-black/20 border border-white/10 rounded-lg text-white placeholder-white/40 focus:border-blue-500 focus:outline-none"
+                placeholder="https://example.com/secondary.jpg"
+              />
+              {formData.secondaryImageUrl && (
+                <div className="mt-2 w-full h-32 relative rounded-lg overflow-hidden bg-black/40 border border-white/10">
+                  <img 
+                    src={formData.secondaryImageUrl} 
+                    alt="Secondary preview"
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = 'none';
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+          
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-white/70 mb-2">Side Image URL</label>
+              <input
+                type="url"
+                value={formData.sideImageUrl || ''}
+                onChange={(e) => updateFormData('sideImageUrl', e.target.value)}
+                className="w-full px-3 py-2 bg-black/20 border border-white/10 rounded-lg text-white placeholder-white/40 focus:border-blue-500 focus:outline-none"
+                placeholder="https://example.com/side.jpg"
+              />
+              {formData.sideImageUrl && (
+                <div className="mt-2 w-full h-32 relative rounded-lg overflow-hidden bg-black/40 border border-white/10">
+                  <img 
+                    src={formData.sideImageUrl} 
+                    alt="Side preview"
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = 'none';
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-white/70 mb-2">Logo Image URL</label>
+              <input
+                type="url"
+                value={formData.logoImageUrl || ''}
+                onChange={(e) => updateFormData('logoImageUrl', e.target.value)}
+                className="w-full px-3 py-2 bg-black/20 border border-white/10 rounded-lg text-white placeholder-white/40 focus:border-blue-500 focus:outline-none"
+                placeholder="https://example.com/logo.jpg"
+              />
+              {formData.logoImageUrl && (
+                <div className="mt-2 w-full h-32 relative rounded-lg overflow-hidden bg-black/40 border border-white/10">
+                  <img 
+                    src={formData.logoImageUrl} 
+                    alt="Logo preview"
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = 'none';
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
   );
 }
