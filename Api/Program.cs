@@ -860,6 +860,17 @@ admin.MapPost("/boat", async (BoatUpsert dto, AppDb db) =>
     return Results.Created($"/admin/boat/{b.Id}", b);
 });
 
+//Get single boat by ID
+admin.MapGet("/boat/{id:guid}", async (Guid id, AppDb db) =>
+{
+    var b = await db.Boats
+        .Include(x => x.Categories)
+        .FirstOrDefaultAsync(x => x.Id == id);
+
+    if (b is null) return Results.NotFound();
+    return Results.Ok(b);
+});
+
 //toggle active boat
 admin.MapPost("/boat/{id:guid}/toggle-active", async (Guid id, AppDb db) =>
 {
