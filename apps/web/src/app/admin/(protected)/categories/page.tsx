@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Plus, Search, X } from "lucide-react";
-import { CategoriesApi, type CategoryRow } from "@/app/lib/admin-api";
+import { CategoriesApi, BoatsApi, type CategoryRow, type Boat } from "@/app/lib/admin-api";
 
 function initialsFromName(name: string) {
   const p = name.trim().split(/\s+/);
@@ -11,18 +11,26 @@ function initialsFromName(name: string) {
 
 export default function CategoriesPage() {
   const [rows, setRows] = useState<CategoryRow[]>([]);
+  const [boats, setBoats] = useState<Boat[]>([]);
   const [busy, setBusy] = useState(false);
   const [search, setSearch] = useState("");
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState("");
+  const [selectedBoatId, setSelectedBoatId] = useState<string>("");
+  const [sortOrder, setSortOrder] = useState(0);
+  const [isRequired, setIsRequired] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   async function load() {
     setBusy(true);
     setErr(null);
     try {
-      const res = await CategoriesApi.list({ search });
-      setRows(res.items ?? []);
+      const [categoriesRes, boatsRes] = await Promise.all([
+        CategoriesApi.list({ search }),
+        BoatsApi.list()
+      ]);
+      setRows(categoriesRes.items ?? []);
+      setBoats(boatsRes.items ?? []);
     } catch (e) {
       console.error(e);
       setErr(e instanceof Error ? e.message : String(e));
@@ -45,11 +53,23 @@ export default function CategoriesPage() {
 
   async function addCategory() {
     if (!newName.trim()) return;
+    if (!selectedBoatId) {
+      setErr("Please select a boat");
+      return;
+    }
     setErr(null);
     try {
-      const created = await CategoriesApi.create({ name: newName.trim() });
+      const created = await CategoriesApi.create({ 
+        Name: newName.trim(),
+        BoatId: selectedBoatId,
+        SortOrder: sortOrder,
+        IsRequired: isRequired
+      });
       setRows((r) => [created, ...r]);
       setNewName("");
+      setSelectedBoatId("");
+      setSortOrder(0);
+      setIsRequired(false);
       setAdding(false);
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
@@ -102,27 +122,81 @@ export default function CategoriesPage() {
 
       {/* Inline Add Row */}
       {adding && (
-        <div className="rounded-lg border border-white/10 bg-[#1f1f1f] p-3">
-          <div className="flex items-center gap-2">
-            <input
-              autoFocus
-              value={newName}
-              placeholder="Category name…"
-              onChange={(e) => setNewName(e.target.value)}
-              className="flex-1 bg-[#151515] border border-white/10 rounded px-3 py-2 outline-none focus:ring-2 focus:ring-white/10"
-            />
-            <button
-              onClick={() => setAdding(false)}
-              className="px-3 py-2 rounded border border-white/15 hover:bg-white/10"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={addCategory}
-              className="px-3 py-2 rounded bg-amber-500 text-black hover:bg-amber-400"
-            >
-              Save
-            </button>
+        <div className="rounded-lg border border-white/10 bg-[#1f1f1f] p-4">
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm text-white/70 mb-2">Category Name</label>
+                <input
+                  autoFocus
+                  value={newName}
+                  placeholder="Category name…"
+                  onChange={(e) => setNewName(e.target.value)}
+                  className="w-full bg-[#151515] border border-white/10 rounded px-3 py-2 outline-none focus:ring-2 focus:ring-white/10"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-white/70 mb-2">Boat</label>
+                <select
+                  value={selectedBoatId}
+                  onChange={(e) => setSelectedBoatId(e.target.value)}
+                  className="w-full bg-[#151515] border border-white/10 rounded px-3 py-2 outline-none focus:ring-2 focus:ring-white/10"
+                >
+                  <option value="">Select a boat...</option>
+                  {boats.map((boat) => (
+                    <option key={boat.id} value={boat.id}>
+                      {boat.name} ({boat.modelYear})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm text-white/70 mb-2">Sort Order</label>
+                <input
+                  type="number"
+                  value={sortOrder}
+                  onChange={(e) => setSortOrder(Number(e.target.value))}
+                  className="w-full bg-[#151515] border border-white/10 rounded px-3 py-2 outline-none focus:ring-2 focus:ring-white/10"
+                />
+              </div>
+              <div className="flex items-center space-x-2 pt-6">
+                <input
+                  type="checkbox"
+                  id="isRequired"
+                  checked={isRequired}
+                  onChange={(e) => setIsRequired(e.target.checked)}
+                  className="rounded border-white/10 bg-[#151515]"
+                />
+                <label htmlFor="isRequired" className="text-sm text-white/70">
+                  Required category
+                </label>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-2 pt-2">
+              <button
+                onClick={() => {
+                  setAdding(false);
+                  setNewName("");
+                  setSelectedBoatId("");
+                  setSortOrder(0);
+                  setIsRequired(false);
+                }}
+                className="px-4 py-2 rounded border border-white/15 hover:bg-white/10"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={addCategory}
+                disabled={!newName.trim() || !selectedBoatId}
+                className="px-4 py-2 rounded bg-amber-500 text-black hover:bg-amber-400 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Save Category
+              </button>
+            </div>
           </div>
         </div>
       )}

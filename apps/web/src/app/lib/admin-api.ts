@@ -186,7 +186,7 @@ export const CategoriesApi = {
     return j<{items:CategoryRow[]}>(res);
   },
 
-  async create(body: { name: string;}) {
+  async create(body: { Name: string; BoatId: string; SortOrder: number; IsRequired: boolean; }) {
     const res = await fetch(`${API}/admin/category`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...authHeaders()},
