@@ -21,7 +21,9 @@ if (!API || API === 'undefined') {
   API = fallbackUrl;
 }
 
+import { string } from "zod";
 import { authFetch } from "../lib/auth-client";
+import { features } from "process";
 
 export type Boat = { id: string; slug: string; name: string; basePrice: number; modelYear?: number | null; isActive: boolean; heroImageUrl?: string|null; };
 export type Category = { id: string; boatId: string; name: string; sortOrder: number; isRequired: boolean; };
@@ -66,6 +68,26 @@ export type CategoryRow = {
   slug?: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export type BoatSummary = {
+  id: string;
+  modelYear: number;
+  name: string;
+  category: string;
+  msrp?: number | null;
+  features?: string | null;
+  startBuildUrl?: string | null;
+  heroUrl?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export type BoatConfigNode = {
+  id: string;
+  name: string;
+  type: "group" | "category" | "option";
+  children?: BoatConfigNode[];
 }
 
 export const SettingsApi = {
@@ -172,8 +194,55 @@ export const BoatsApi = {
       method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify(body)
-    }).then(j<Boat>)
+    }).then(j<Boat>),
+    async get(id:string){
+      const r = await authFetch(`${API}/admin/boat/${id}`, {headers:{...authHeaders()}, cache:"no-store"});
+      return j<{boat: BoatSummary; tree: BoatConfigNode[] }>(r);
+    },
+    async updateSummary(id: string, patch: Partial<BoatSummary>){
+    const r = await fetch(`${API}/admin/boats/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify(patch),
+    });
+    return j<BoatSummary>(r);
+  },
+
+  // --- tree mutations ---
+  async addNode(boatId: string, parentId: string | null, type: BoatConfigNode["type"], name: string){
+    const r = await fetch(`${API}/admin/boats/${boatId}/config/nodes`,{
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify({ parentId, type, name }),
+    });
+    return j<BoatConfigNode>(r);
+  },
+  async renameNode(boatId: string, nodeId: string, name: string){
+    const r = await fetch(`${API}/admin/boats/${boatId}/config/nodes/${nodeId}`,{
+      method:"PATCH",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify({ name }),
+    });
+    return j<BoatConfigNode>(r);
+  },
+  async deleteNode(boatId: string, nodeId: string){
+    const r = await fetch(`${API}/admin/boats/${boatId}/config/nodes/${nodeId}`,{
+      method:"DELETE",
+      headers: { ...authHeaders() },
+    });
+    if(!r.ok) throw new Error(await r.text());
+  },
+  async moveNode(boatId: string, nodeId: string, direction: "up"|"down"){
+    const r = await fetch(`${API}/admin/boats/${boatId}/config/nodes/${nodeId}/move`,{
+      method:"POST",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify({ direction }),
+    });
+    return j<{ tree: BoatConfigNode[] }>(r);
+  },
 };
+
+
 
 export const CategoriesApi = {
   async list(apts?: {search?: string}) {
