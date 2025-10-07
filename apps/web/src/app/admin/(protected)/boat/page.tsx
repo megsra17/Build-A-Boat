@@ -3,9 +3,8 @@
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import { BoatsApi, type Boat } from "@/app/lib/admin-api";
-import {Search, Plus, RefreshCw, Copy, Trash2 } from "lucide-react";
+import {Search, Plus, RefreshCw, Copy, Trash2, Edit } from "lucide-react";
 import Link from "next/link";
-import { de } from "zod/locales";
 
 export default function BoatsPage() {
   const [rows, setRows] = useState<Boat[]>([]);
@@ -24,7 +23,7 @@ export default function BoatsPage() {
     try{
       const res = await BoatsApi.list(search || undefined);
       setRows(res.items);
-    } catch (error) {
+    } catch {
       setError("Failed to load boats");
     } finally {
       setBusy(false);
@@ -33,6 +32,7 @@ export default function BoatsPage() {
 
   useEffect(() => {
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -40,17 +40,24 @@ export default function BoatsPage() {
       load();
     }, 500);
     return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   },[search]);
 
   async function toggleActive(id: string) {
     try { await BoatsApi.toggleActive(id); load(); }
-    catch(e:any){ alert(e.message || e); }
+    catch(e: unknown){ 
+      const message = e instanceof Error ? e.message : String(e);
+      alert(message); 
+    }
   }
 
   async function deleteBoat(id: string) {
     if(!confirm("Are you sure you want to delete this boat? This action cannot be undone.")) return;
     try { await BoatsApi.remove(id); load(); }
-    catch(e:any){ alert(e.message || e); }
+    catch(e: unknown){ 
+      const message = e instanceof Error ? e.message : String(e);
+      alert(message); 
+    }
   }
 
   function openDup(b: Boat) {
@@ -70,7 +77,10 @@ export default function BoatsPage() {
       });
       setShowDupFor(null);
       load();
-    } catch (e:any) { alert(e.message || e); }
+    } catch (e: unknown) { 
+      const message = e instanceof Error ? e.message : String(e);
+      alert(message); 
+    }
   }
 
   return (
@@ -100,7 +110,7 @@ export default function BoatsPage() {
               <th className="text-left px-4 py-2 w-32">Model Year</th>
               <th className="text-left px-4 py-2">Name</th>
               <th className="text-left px-4 py-2 w-28">Status</th>
-              <th className="px-2 py-2 w-[120px]"></th>
+              <th className="px-2 py-2 w-[140px]"></th>
             </tr>
           </thead>
           <tbody>
@@ -119,7 +129,7 @@ export default function BoatsPage() {
                   </div>
                 </td>
                 <td className="px-4 py-3">
-                  <Link href={`/admin/boat/${b.id}/edit`} className="hover:underline">{b.name}</Link>
+                  <Link href={`/admin/boat/${b.id}`} className="hover:underline">{b.name}</Link>
                   <div className="text-white/50 text-xs">{b.slug}</div>
                 </td>
                 <td className="px-4 py-3">
@@ -131,6 +141,13 @@ export default function BoatsPage() {
                 </td>
                 <td className="px-2 py-3 text-right">
                   <div className="inline-flex items-center gap-2">
+                    <Link
+                      href={`/admin/boat/${b.id}`}
+                      title="Edit"
+                      className="p-1.5 rounded-full border border-white/15 hover:bg-white/10"
+                    >
+                      <Edit className="size-4" />
+                    </Link>
                     <button
                       onClick={() => toggleActive(b.id)}
                       title="Toggle active"

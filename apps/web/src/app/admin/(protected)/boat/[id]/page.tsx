@@ -1,194 +1,327 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { BoatsApi, type Boat } from "@/app/lib/admin-api";
+import { ArrowLeft, Save } from "lucide-react";
+import Link from "next/link";
 
-// Extended boat type for the detail view (API might return more fields than the base type)
-type ExtendedBoat = Boat & {
-  features?: string[] | string;
-  primaryImageUrl?: string;
-  secondaryImageUrl?: string;
-  sideImageUrl?: string;
-  logoImageUrl?: string;
-};
-
-export default function BoatDetailPage() {
+export default function EditBoatPage() {
   const router = useRouter();
   const params = useParams();
   const boatId = params.id as string;
-  
-  const [boat, setBoat] = useState<ExtendedBoat | null>(null);
+
+  const [boat, setBoat] = useState<Boat | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  // Form fields
+  const [name, setName] = useState("");
+  const [slug, setSlug] = useState("");
+  const [modelYear, setModelYear] = useState<number | undefined>(undefined);
+  const [basePrice, setBasePrice] = useState<number>(0);
+  const [isActive, setIsActive] = useState(true);
+  const [heroImageUrl, setHeroImageUrl] = useState("");
+  const [features, setFeatures] = useState("");
+  const [primaryImageUrl, setPrimaryImageUrl] = useState("");
+  const [secondaryImageUrl, setSecondaryImageUrl] = useState("");
+  const [sideImageUrl, setSideImageUrl] = useState("");
+  const [logoImageUrl, setLogoImageUrl] = useState("");
 
   useEffect(() => {
-    const loadBoat = async () => {
-      try {
-        setLoading(true);
-        // For now, we'll need to get the boat from the list since there's no individual boat endpoint
-        const response = await BoatsApi.list();
-        const foundBoat = response.items.find((b: Boat) => b.id === boatId);
-        
-        if (foundBoat) {
-          setBoat(foundBoat as ExtendedBoat);
-        } else {
-          setError("Boat not found");
-        }
-      } catch {
-        setError("Failed to load boat");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (boatId) {
-      loadBoat();
-    }
+    loadBoat();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [boatId]);
+
+  async function loadBoat() {
+    try {
+      setLoading(true);
+      setError("");
+      
+      // Get the boat from the boats list API since we don't have a single boat endpoint
+      const res = await BoatsApi.list();
+      const foundBoat = res.items.find(b => b.id === boatId);
+      
+      if (!foundBoat) {
+        setError("Boat not found");
+        return;
+      }
+
+      setBoat(foundBoat);
+      
+      // Populate form fields
+      setName(foundBoat.name);
+      setSlug(foundBoat.slug);
+      setModelYear(foundBoat.modelYear ?? undefined);
+      setBasePrice(foundBoat.basePrice);
+      setIsActive(foundBoat.isActive);
+      setHeroImageUrl(foundBoat.heroImageUrl || "");
+      
+      // For the new fields, we'll need to fetch from a detailed endpoint if available
+      // For now, initialize as empty
+      setFeatures("");
+      setPrimaryImageUrl("");
+      setSecondaryImageUrl("");
+      setSideImageUrl("");
+      setLogoImageUrl("");
+      
+    } catch (err) {
+      setError("Failed to load boat");
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleSave() {
+    if (!name.trim() || !slug.trim()) {
+      setError("Name and slug are required");
+      return;
+    }
+
+    try {
+      setSaving(true);
+      setError("");
+
+      await BoatsApi.update(boatId, {
+        slug: slug.trim(),
+        name: name.trim(),
+        basePrice: basePrice,
+        modelYear: modelYear || new Date().getFullYear(),
+        heroImageUrl: heroImageUrl.trim() || undefined
+      });
+
+      router.push("/admin/boat");
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : "Failed to save boat";
+      setError(errorMessage);
+    } finally {
+      setSaving(false);
+    }
+  }
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-white/70">Loading boat details...</div>
+      <div className="space-y-4">
+        <div className="flex items-center gap-4">
+          <Link href="/admin/boat" className="p-2 rounded-full border border-white/15 hover:bg-white/10">
+            <ArrowLeft className="size-4" />
+          </Link>
+          <h1 className="text-3xl font-semibold">Loading...</h1>
+        </div>
       </div>
     );
   }
 
-  if (error || !boat) {
+  if (error && !boat) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
-        <div className="text-red-300">{error || "Boat not found"}</div>
-        <button 
-          onClick={() => router.push("/admin/boat")}
-          className="px-4 py-2 bg-amber-500 text-black rounded-lg hover:bg-amber-400"
-        >
-          Back to Boats
-        </button>
+      <div className="space-y-4">
+        <div className="flex items-center gap-4">
+          <Link href="/admin/boat" className="p-2 rounded-full border border-white/15 hover:bg-white/10">
+            <ArrowLeft className="size-4" />
+          </Link>
+          <h1 className="text-3xl font-semibold">Error</h1>
+        </div>
+        <div className="text-red-400">{error}</div>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <button 
-            onClick={() => router.push("/admin/boat")}
-            className="px-3 py-1 border border-white/20 rounded-lg text-white/70 hover:text-white"
-          >
-            ← Back
-          </button>
-          <h1 className="text-2xl font-semibold">{boat.name}</h1>
+        <div className="flex items-center gap-4">
+          <Link href="/admin/boat" className="p-2 rounded-full border border-white/15 hover:bg-white/10">
+            <ArrowLeft className="size-4" />
+          </Link>
+          <h1 className="text-3xl font-semibold">Edit Boat</h1>
         </div>
-        <div className="flex items-center space-x-2">
-          <span className={`px-2 py-1 rounded-full text-xs ${
-            boat.isActive 
-              ? 'bg-emerald-600/20 text-emerald-300' 
-              : 'bg-white/10 text-white/70'
-          }`}>
-            {boat.isActive ? 'Active' : 'Inactive'}
-          </span>
-        </div>
+        
+        <button
+          onClick={handleSave}
+          disabled={saving || !name.trim() || !slug.trim()}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed text-black font-medium"
+        >
+          <Save className="size-4" />
+          {saving ? "Saving..." : "Save Changes"}
+        </button>
       </div>
 
+      {error && (
+        <div className="text-red-400 bg-red-950/40 border border-red-800/40 rounded-lg px-3 py-2">
+          {error}
+        </div>
+      )}
+
+      {/* Form */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="space-y-4">
-          <div className="rounded-xl border border-white/10 bg-[#151515] p-6">
-            <h2 className="text-lg font-semibold mb-4">Boat Information</h2>
-            <div className="space-y-3">
+        {/* Basic Information */}
+        <div className="space-y-6">
+          <div className="rounded-lg border border-white/10 bg-[#1f1f1f] p-6">
+            <h2 className="text-xl font-semibold mb-4">Basic Information</h2>
+            
+            <div className="space-y-4">
               <div>
-                <label className="block text-sm text-white/70 mb-1">Name</label>
-                <div className="text-white">{boat.name}</div>
+                <label className="block text-sm font-medium text-white/70 mb-2">
+                  Boat Name *
+                </label>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="w-full px-3 py-2 bg-[#151515] border border-white/10 rounded-md text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                  placeholder="Enter boat name"
+                />
               </div>
+
               <div>
-                <label className="block text-sm text-white/70 mb-1">Slug</label>
-                <div className="text-white/80 font-mono">{boat.slug}</div>
+                <label className="block text-sm font-medium text-white/70 mb-2">
+                  Slug *
+                </label>
+                <input
+                  type="text"
+                  value={slug}
+                  onChange={(e) => setSlug(e.target.value)}
+                  className="w-full px-3 py-2 bg-[#151515] border border-white/10 rounded-md text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                  placeholder="boat-slug"
+                />
               </div>
+
               <div>
-                <label className="block text-sm text-white/70 mb-1">Model Year</label>
-                <div className="text-white">{boat.modelYear || 'Not set'}</div>
+                <label className="block text-sm font-medium text-white/70 mb-2">
+                  Model Year
+                </label>
+                <input
+                  type="number"
+                  value={modelYear || ""}
+                  onChange={(e) => setModelYear(e.target.value ? Number(e.target.value) : undefined)}
+                  className="w-full px-3 py-2 bg-[#151515] border border-white/10 rounded-md text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                  placeholder="2024"
+                />
               </div>
+
               <div>
-                <label className="block text-sm text-white/70 mb-1">Base Price</label>
-                <div className="text-white">
-                  {boat.basePrice 
-                    ? `$${boat.basePrice.toLocaleString()}` 
-                    : 'Not set'
-                  }
-                </div>
+                <label className="block text-sm font-medium text-white/70 mb-2">
+                  Base Price
+                </label>
+                <input
+                  type="number"
+                  value={basePrice}
+                  onChange={(e) => setBasePrice(Number(e.target.value) || 0)}
+                  className="w-full px-3 py-2 bg-[#151515] border border-white/10 rounded-md text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                  placeholder="50000"
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="isActive"
+                  checked={isActive}
+                  onChange={(e) => setIsActive(e.target.checked)}
+                  className="w-4 h-4 text-amber-600 bg-[#151515] border-white/10 rounded focus:ring-amber-500"
+                />
+                <label htmlFor="isActive" className="text-sm font-medium text-white/70">
+                  Active
+                </label>
               </div>
             </div>
           </div>
 
-          {boat.features && (
-            <div className="rounded-xl border border-white/10 bg-[#151515] p-6">
-              <h2 className="text-lg font-semibold mb-4">Features</h2>
-              <div className="space-y-2">
-                {Array.isArray(boat.features) ? (
-                  boat.features.map((feature: string, index: number) => (
-                    <div key={index} className="flex items-center space-x-2">
-                      <span className="w-1.5 h-1.5 bg-amber-400 rounded-full"></span>
-                      <span className="text-white/80">{feature}</span>
-                    </div>
-                  ))
-                ) : (
-                  <div className="text-white/60">No features listed</div>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="space-y-4">
-          <div className="rounded-xl border border-white/10 bg-[#151515] p-6">
-            <h2 className="text-lg font-semibold mb-4">Images</h2>
-            <div className="grid grid-cols-2 gap-4">
-              {[
-                { label: 'Primary', url: boat.primaryImageUrl },
-                { label: 'Secondary', url: boat.secondaryImageUrl },
-                { label: 'Side', url: boat.sideImageUrl },
-                { label: 'Logo', url: boat.logoImageUrl },
-              ].map((image) => (
-                <div key={image.label} className="space-y-2">
-                  <div className="text-sm text-white/70">{image.label}</div>
-                  <div className="aspect-square rounded-lg border border-white/10 overflow-hidden bg-black/40">
-                    {image.url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img 
-                        src={image.url} 
-                        alt={`${image.label} image`}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-white/40">
-                        No image
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
+          {/* Features */}
+          <div className="rounded-lg border border-white/10 bg-[#1f1f1f] p-6">
+            <h2 className="text-xl font-semibold mb-4">Features</h2>
+            
+            <div>
+              <label className="block text-sm font-medium text-white/70 mb-2">
+                Features (JSON or text)
+              </label>
+              <textarea
+                value={features}
+                onChange={(e) => setFeatures(e.target.value)}
+                rows={4}
+                className="w-full px-3 py-2 bg-[#151515] border border-white/10 rounded-md text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                placeholder="Enter boat features..."
+              />
             </div>
           </div>
         </div>
-      </div>
 
-      <div className="flex justify-end space-x-3">
-        <button 
-          onClick={() => router.push("/admin/boat")}
-          className="px-4 py-2 border border-white/20 rounded-lg text-white/70 hover:text-white"
-        >
-          Close
-        </button>
-        <button 
-          className="px-4 py-2 bg-amber-500 text-black rounded-lg hover:bg-amber-400"
-          onClick={() => {
-            // TODO: Implement edit functionality
-            alert("Edit functionality coming soon!");
-          }}
-        >
-          Edit Boat
-        </button>
+        {/* Images */}
+        <div className="space-y-6">
+          <div className="rounded-lg border border-white/10 bg-[#1f1f1f] p-6">
+            <h2 className="text-xl font-semibold mb-4">Images</h2>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-white/70 mb-2">
+                  Hero Image URL
+                </label>
+                <input
+                  type="url"
+                  value={heroImageUrl}
+                  onChange={(e) => setHeroImageUrl(e.target.value)}
+                  className="w-full px-3 py-2 bg-[#151515] border border-white/10 rounded-md text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                  placeholder="https://example.com/hero.jpg"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-white/70 mb-2">
+                  Primary Image URL
+                </label>
+                <input
+                  type="url"
+                  value={primaryImageUrl}
+                  onChange={(e) => setPrimaryImageUrl(e.target.value)}
+                  className="w-full px-3 py-2 bg-[#151515] border border-white/10 rounded-md text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                  placeholder="https://example.com/primary.jpg"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-white/70 mb-2">
+                  Secondary Image URL
+                </label>
+                <input
+                  type="url"
+                  value={secondaryImageUrl}
+                  onChange={(e) => setSecondaryImageUrl(e.target.value)}
+                  className="w-full px-3 py-2 bg-[#151515] border border-white/10 rounded-md text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                  placeholder="https://example.com/secondary.jpg"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-white/70 mb-2">
+                  Side Image URL
+                </label>
+                <input
+                  type="url"
+                  value={sideImageUrl}
+                  onChange={(e) => setSideImageUrl(e.target.value)}
+                  className="w-full px-3 py-2 bg-[#151515] border border-white/10 rounded-md text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                  placeholder="https://example.com/side.jpg"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-white/70 mb-2">
+                  Logo Image URL
+                </label>
+                <input
+                  type="url"
+                  value={logoImageUrl}
+                  onChange={(e) => setLogoImageUrl(e.target.value)}
+                  className="w-full px-3 py-2 bg-[#151515] border border-white/10 rounded-md text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                  placeholder="https://example.com/logo.jpg"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
