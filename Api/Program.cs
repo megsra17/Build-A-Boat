@@ -97,6 +97,12 @@ builder.Services.AddScoped<ConstraintEngine>();
 // Add email service
 builder.Services.AddScoped<IEmailService, EmailService>();
 
+// Configure JSON serialization to handle circular references
+builder.Services.ConfigureHttpJsonOptions(options =>
+{
+    options.SerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
+});
+
 //Auth
 var jwtSection = builder.Configuration.GetSection("Jwt");
 var jwtSecret = Environment.GetEnvironmentVariable("JWT_SECRET") ?? jwtSection["Secret"];
