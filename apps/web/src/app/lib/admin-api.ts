@@ -200,7 +200,7 @@ export const BoatsApi = {
       return j<{boat: BoatSummary; tree: BoatConfigNode[] }>(r);
     },
     async updateSummary(id: string, patch: Partial<BoatSummary>){
-    const r = await fetch(`${API}/admin/boats/${id}`, {
+    const r = await fetch(`${API}/admin/boat/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", ...authHeaders() },
       body: JSON.stringify(patch),
@@ -210,7 +210,7 @@ export const BoatsApi = {
 
   // --- tree mutations ---
   async addNode(boatId: string, parentId: string | null, type: BoatConfigNode["type"], name: string){
-    const r = await fetch(`${API}/admin/boats/${boatId}/config/nodes`,{
+    const r = await fetch(`${API}/admin/boat/${boatId}/config/nodes`,{
       method: "POST",
       headers: { "Content-Type": "application/json", ...authHeaders() },
       body: JSON.stringify({ parentId, type, name }),
@@ -218,7 +218,7 @@ export const BoatsApi = {
     return j<BoatConfigNode>(r);
   },
   async renameNode(boatId: string, nodeId: string, name: string){
-    const r = await fetch(`${API}/admin/boats/${boatId}/config/nodes/${nodeId}`,{
+    const r = await fetch(`${API}/admin/boat/${boatId}/config/nodes/${nodeId}`,{
       method:"PATCH",
       headers: { "Content-Type": "application/json", ...authHeaders() },
       body: JSON.stringify({ name }),
@@ -226,14 +226,14 @@ export const BoatsApi = {
     return j<BoatConfigNode>(r);
   },
   async deleteNode(boatId: string, nodeId: string){
-    const r = await fetch(`${API}/admin/boats/${boatId}/config/nodes/${nodeId}`,{
+    const r = await fetch(`${API}/admin/boat/${boatId}/config/nodes/${nodeId}`,{
       method:"DELETE",
       headers: { ...authHeaders() },
     });
     if(!r.ok) throw new Error(await r.text());
   },
   async moveNode(boatId: string, nodeId: string, direction: "up"|"down"){
-    const r = await fetch(`${API}/admin/boats/${boatId}/config/nodes/${nodeId}/move`,{
+    const r = await fetch(`${API}/admin/boat/${boatId}/config/nodes/${nodeId}/move`,{
       method:"POST",
       headers: { "Content-Type": "application/json", ...authHeaders() },
       body: JSON.stringify({ direction }),
