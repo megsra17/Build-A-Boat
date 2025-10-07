@@ -119,7 +119,7 @@ export default function BoatsPage() {
                   </div>
                 </td>
                 <td className="px-4 py-3">
-                  <Link href={`/admin/boat/${b.id}`} className="hover:underline">{b.name}</Link>
+                  <Link href={`/admin/boat/${b.id}/edit`} className="hover:underline">{b.name}</Link>
                   <div className="text-white/50 text-xs">{b.slug}</div>
                 </td>
                 <td className="px-4 py-3">

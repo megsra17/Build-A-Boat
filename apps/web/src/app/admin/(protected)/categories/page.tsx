@@ -26,10 +26,12 @@ export default function CategoriesPage() {
         CategoriesApi.list({ search }),
         BoatsApi.list()
       ]);
+      console.log("Categories API response:", categoriesRes);
+      console.log("Boats API response:", boatsRes);
       setRows(categoriesRes.items ?? []);
       setBoats(boatsRes.items ?? []);
     } catch (e) {
-      console.error(e);
+      console.error("Error loading data:", e);
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
