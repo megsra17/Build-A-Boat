@@ -4,15 +4,10 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import { Save, ArrowLeft, Trash2 } from "lucide-react";
+import { BoatsApi, type Boat as BaseBoat } from "@/app/lib/admin-api";
 
-type Boat = {
-  id: string;
-  slug: string;
-  name: string;
-  basePrice: number;
-  isActive: boolean;
-  modelYear?: number | null;
-  heroImageUrl?: string | null;
+// Extended Boat type with all the properties we need
+type ExtendedBoat = BaseBoat & {
   features?: string | null;
   primaryImageUrl?: string | null;
   secondaryImageUrl?: string | null;
@@ -27,17 +22,9 @@ export default function BoatEditPage() {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [boat, setBoat] = useState<Boat | null>(null);
+  const [boat, setBoat] = useState<ExtendedBoat | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [formData, setFormData] = useState<Partial<Boat>>({});
-
-  // Get API base URL
-  const getApiBase = () => {
-    if (process.env.NODE_ENV === 'production') {
-      return 'https://build-a-boat-production.up.railway.app';
-    }
-    return 'http://localhost:5199';
-  };
+  const [formData, setFormData] = useState<Partial<ExtendedBoat>>({});
 
   useEffect(() => {
     let mounted = true;
@@ -49,31 +36,25 @@ export default function BoatEditPage() {
       setError(null);
       
       try {
-        const apiBase = getApiBase();
-        console.log('Fetching boat from:', `${apiBase}/admin/boat/${boatId}`);
+        console.log('Fetching boat with ID:', boatId);
         
-        const response = await fetch(`${apiBase}/admin/boat/${boatId}`);
-        if (!response.ok) {
-          throw new Error(`Failed to fetch boat: ${response.status} ${response.statusText}`);
-        }
-        const boatData = await response.json();
-        
+        // Use the new getById function to fetch the boat
+        const boatData = await BoatsApi.getById(boatId);
         console.log('Boat data received:', boatData);
         
         if (mounted) {
-          setBoat(boatData);
-          setFormData({
-            name: boatData.name,
-            slug: boatData.slug,
-            basePrice: boatData.basePrice,
-            modelYear: boatData.modelYear,
-            heroImageUrl: boatData.heroImageUrl,
-            features: boatData.features,
-            primaryImageUrl: boatData.primaryImageUrl,
-            secondaryImageUrl: boatData.secondaryImageUrl,
-            sideImageUrl: boatData.sideImageUrl,
-            logoImageUrl: boatData.logoImageUrl,
-          });
+          // Convert the base boat to our extended type
+          const extendedBoat: ExtendedBoat = {
+            ...boatData,
+            features: null, // API might not have these yet
+            primaryImageUrl: null,
+            secondaryImageUrl: null,
+            sideImageUrl: null,
+            logoImageUrl: null,
+          };
+          
+          setBoat(extendedBoat);
+          setFormData(extendedBoat);
         }
       } catch (err) {
         console.error('Error fetching boat:', err);
@@ -101,22 +82,9 @@ export default function BoatEditPage() {
     setError(null);
     
     try {
-      const apiBase = getApiBase();
-      
-      const response = await fetch(`${apiBase}/admin/boat/${boatId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData),
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to update boat: ${response.status} ${response.statusText}`);
-      }
-      
-      const updatedBoat = await response.json();
-      setBoat(updatedBoat);
+      // Use the existing BoatsApi.update function
+      const updatedBoat = await BoatsApi.update(boatId, formData);
+      setBoat({ ...boat, ...updatedBoat });
       
       // Show success message
       alert('Boat updated successfully!');
@@ -137,15 +105,8 @@ export default function BoatEditPage() {
     }
     
     try {
-      const apiBase = getApiBase();
-      
-      const response = await fetch(`${apiBase}/admin/boat/${boatId}`, {
-        method: 'DELETE',
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to delete boat: ${response.status} ${response.statusText}`);
-      }
+      // Use the existing BoatsApi.remove function
+      await BoatsApi.remove(boatId);
       
       alert('Boat deleted successfully!');
       router.push('/admin/boat');
@@ -156,7 +117,7 @@ export default function BoatEditPage() {
     }
   };
 
-  const updateFormData = (field: keyof Boat, value: string | number | null) => {
+  const updateFormData = (field: keyof ExtendedBoat, value: string | number | null) => {
     setFormData(prev => ({
       ...prev,
       [field]: value

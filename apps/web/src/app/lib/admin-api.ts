@@ -195,10 +195,15 @@ export const BoatsApi = {
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify(body)
     }).then(j<Boat>),
-    async get(id:string){
-      const r = await authFetch(`${API}/admin/boat/${id}`, {headers:{...authHeaders()}, cache:"no-store"});
-      return j<{boat: BoatSummary; tree: BoatConfigNode[] }>(r);
-    },
+  
+  // Simple function to get a single boat by ID for editing
+  getById: (id:string) =>
+    authFetch(`${API}/admin/boat/${id}`, {
+      headers:{"Content-Type":"application/json"},
+      cache:"no-store"
+    }).then(j<Boat>),
+    
+    
     async updateSummary(id: string, patch: Partial<BoatSummary>){
     const r = await fetch(`${API}/admin/boat/${id}`, {
       method: "PATCH",
