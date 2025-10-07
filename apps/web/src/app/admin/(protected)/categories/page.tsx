@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Plus, Search, X } from "lucide-react";
 import { CategoriesApi, BoatsApi, type CategoryRow, type Boat } from "@/app/lib/admin-api";
 
@@ -16,7 +16,6 @@ export default function CategoriesPage() {
   const [search, setSearch] = useState("");
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState("");
-  const [selectedBoatId, setSelectedBoatId] = useState<string>("");
   const [sortOrder, setSortOrder] = useState(0);
   const [isRequired, setIsRequired] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -53,21 +52,19 @@ export default function CategoriesPage() {
 
   async function addCategory() {
     if (!newName.trim()) return;
-    if (!selectedBoatId) {
-      setErr("Please select a boat");
-      return;
-    }
     setErr(null);
     try {
+      // Use the first available boat as default, or a special default ID
+      const defaultBoatId = boats.length > 0 ? boats[0].id : "00000000-0000-0000-0000-000000000000";
+      
       const created = await CategoriesApi.create({ 
         Name: newName.trim(),
-        BoatId: selectedBoatId,
+        BoatId: defaultBoatId,
         SortOrder: sortOrder,
         IsRequired: isRequired
       });
       setRows((r) => [created, ...r]);
       setNewName("");
-      setSelectedBoatId("");
       setSortOrder(0);
       setIsRequired(false);
       setAdding(false);
@@ -124,32 +121,15 @@ export default function CategoriesPage() {
       {adding && (
         <div className="rounded-lg border border-white/10 bg-[#1f1f1f] p-4">
           <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm text-white/70 mb-2">Category Name</label>
-                <input
-                  autoFocus
-                  value={newName}
-                  placeholder="Category name…"
-                  onChange={(e) => setNewName(e.target.value)}
-                  className="w-full bg-[#151515] border border-white/10 rounded px-3 py-2 outline-none focus:ring-2 focus:ring-white/10"
-                />
-              </div>
-              <div>
-                <label className="block text-sm text-white/70 mb-2">Boat</label>
-                <select
-                  value={selectedBoatId}
-                  onChange={(e) => setSelectedBoatId(e.target.value)}
-                  className="w-full bg-[#151515] border border-white/10 rounded px-3 py-2 outline-none focus:ring-2 focus:ring-white/10"
-                >
-                  <option value="">Select a boat...</option>
-                  {boats.map((boat) => (
-                    <option key={boat.id} value={boat.id}>
-                      {boat.name} ({boat.modelYear})
-                    </option>
-                  ))}
-                </select>
-              </div>
+            <div>
+              <label className="block text-sm text-white/70 mb-2">Category Name</label>
+              <input
+                autoFocus
+                value={newName}
+                placeholder="Category name…"
+                onChange={(e) => setNewName(e.target.value)}
+                className="w-full bg-[#151515] border border-white/10 rounded px-3 py-2 outline-none focus:ring-2 focus:ring-white/10"
+              />
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -181,7 +161,6 @@ export default function CategoriesPage() {
                 onClick={() => {
                   setAdding(false);
                   setNewName("");
-                  setSelectedBoatId("");
                   setSortOrder(0);
                   setIsRequired(false);
                 }}
@@ -191,7 +170,7 @@ export default function CategoriesPage() {
               </button>
               <button
                 onClick={addCategory}
-                disabled={!newName.trim() || !selectedBoatId}
+                disabled={!newName.trim()}
                 className="px-4 py-2 rounded bg-amber-500 text-black hover:bg-amber-400 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Save Category
