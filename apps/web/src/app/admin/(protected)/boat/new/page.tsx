@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import {useRouter} from "next/navigation";
-import {Plus, Check} from "lucide-react";
+import {Plus, Check, Folder} from "lucide-react";
+import FolderBrowser from "../components/FolderBrowser";
 
 // Use Railway URL for production, localhost for development
 const API = process.env.NODE_ENV === 'production' 
@@ -46,6 +47,8 @@ export default function NewBoatPage() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [dragTarget, setDragTarget] = useState<string | null>(null);
+  const [useFolderBrowser, setUseFolderBrowser] = useState(false);
 
   // Fetch next available slug number
   useEffect(() => {
@@ -162,6 +165,78 @@ export default function NewBoatPage() {
         if (mediaOpen) {
           pick(uploadedMedia);
         }
+      })
+      .catch(console.error);
+  }
+
+  // Drag and drop handlers
+  function handleDragOver(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+
+  function handleDragEnter(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    const target = e.currentTarget.getAttribute('data-drag-target');
+    if (target) {
+      setDragTarget(target);
+    }
+  }
+
+  function handleDragLeave(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    // Only clear if we're leaving the element entirely
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setDragTarget(null);
+    }
+  }
+
+  function handleDrop(e: React.DragEvent, target: "primary" | "secondary" | "side" | "logo") {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragTarget(null);
+
+    const files = Array.from(e.dataTransfer.files);
+    const imageFile = files.find(file => file.type.startsWith('image/'));
+
+    if (!imageFile) {
+      setErr("Please drop an image file (JPEG, PNG, GIF, WebP)");
+      return;
+    }
+
+    setErr(null);
+    uploadMedia(imageFile)
+      .then((uploadedMedia) => {
+        // Set the media for the specific target
+        const setter = target === "primary" ? setPrimary
+          : target === "secondary" ? setSecondary
+          : target === "side" ? setSide
+          : setLogo;
+        setter(uploadedMedia);
+      })
+      .catch(console.error);
+  }
+
+  function handleLayersDrop(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragTarget(null);
+
+    const files = Array.from(e.dataTransfer.files);
+    const imageFile = files.find(file => file.type.startsWith('image/'));
+
+    if (!imageFile) {
+      setErr("Please drop an image file (JPEG, PNG, GIF, WebP)");
+      return;
+    }
+
+    setErr(null);
+    uploadMedia(imageFile)
+      .then((uploadedMedia) => {
+        // Add to layers
+        setLayers(l => [...l, uploadedMedia]);
       })
       .catch(console.error);
   }
@@ -297,8 +372,17 @@ export default function NewBoatPage() {
               <button
                 type="button"
                 onClick={() => setMediaOpen({ target: it.key })}
-                className="group w-full aspect-square rounded-full bg-black/60 border border-white/10 flex items-center justify-center overflow-hidden"
-                title="Select media"
+                onDragOver={handleDragOver}
+                onDragEnter={handleDragEnter}
+                onDragLeave={handleDragLeave}
+                onDrop={(e) => handleDrop(e, it.key)}
+                data-drag-target={it.key}
+                className={`group w-full aspect-square rounded-full bg-black/60 border-2 border-dashed flex items-center justify-center overflow-hidden transition-colors duration-200 ${
+                  dragTarget === it.key 
+                    ? 'border-amber-400 bg-amber-400/10' 
+                    : 'border-white/10 hover:border-amber-400'
+                }`}
+                title="Click to select or drag & drop an image"
               >
                 {it.val ? (
                   // preview
@@ -309,7 +393,10 @@ export default function NewBoatPage() {
                     className="w-full h-full object-cover"
                   />
                 ) : (
-                  <div className="text-white/40">Select</div>
+                  <div className="text-center text-white/40">
+                    <div className="text-sm">Drop image</div>
+                    <div className="text-xs mt-1">or click</div>
+                  </div>
                 )}
               </button>
             </div>
@@ -320,13 +407,32 @@ export default function NewBoatPage() {
       {/* Builder Layers */}
       <section className="rounded-xl border border-white/10 bg-[#151515] p-6">
         <h2 className="text-xl font-semibold mb-4">Builder Layers</h2>
-        <button
-          type="button"
-          onClick={() => setMediaOpen({ target: "layers" })}
-          className="rounded-full border border-amber-500/40 text-amber-300 px-4 py-2 hover:bg-amber-500/10"
-        >
-          Select Media
-        </button>
+        <div className="flex items-center gap-4 mb-4">
+          <button
+            type="button"
+            onClick={() => setMediaOpen({ target: "layers" })}
+            className="rounded-full border border-amber-500/40 text-amber-300 px-4 py-2 hover:bg-amber-500/10"
+          >
+            Select Media
+          </button>
+          <div
+            onDragOver={handleDragOver}
+            onDragEnter={handleDragEnter}
+            onDragLeave={handleDragLeave}
+            onDrop={handleLayersDrop}
+            data-drag-target="layers"
+            className={`flex-1 min-h-[60px] border-2 border-dashed rounded-lg bg-black/20 transition-colors duration-200 flex items-center justify-center ${
+              dragTarget === 'layers'
+                ? 'border-amber-400 bg-amber-400/10'
+                : 'border-white/20 hover:border-amber-400'
+            }`}
+          >
+            <div className="text-center text-white/50">
+              <div className="text-sm">Drag & drop images here</div>
+              <div className="text-xs mt-1">or use Select Media button</div>
+            </div>
+          </div>
+        </div>
 
         {!!layers.length && (
           <div className="mt-4 grid grid-cols-2 md:grid-cols-6 gap-3">
@@ -359,11 +465,20 @@ export default function NewBoatPage() {
       </div>
 
       {/* Media Picker */}
-      {mediaOpen && (
+      {mediaOpen && !useFolderBrowser && (
         <div className="fixed inset-0 z-50 bg-black/70 flex">
           <div className="m-auto w-[90vw] max-w-5xl rounded-xl border border-white/10 bg-[#141414] p-6">
             <div className="flex items-center justify-between mb-4">
-              <div className="text-lg">Select Media</div>
+              <div className="flex items-center gap-4">
+                <div className="text-lg">Select Media</div>
+                <button
+                  onClick={() => setUseFolderBrowser(true)}
+                  className="inline-flex items-center gap-2 rounded-lg border border-amber-500/40 text-amber-300 px-3 py-2 hover:bg-amber-500/10"
+                >
+                  <Folder className="size-4" />
+                  Browse Folders
+                </button>
+              </div>
               <button onClick={() => setMediaOpen(null)} className="size-8 rounded-full border border-white/20">
                 ×
               </button>
@@ -426,6 +541,21 @@ export default function NewBoatPage() {
           </div>
         </div>
       )}
+
+      {/* Folder Browser */}
+      <FolderBrowser
+        isOpen={mediaOpen !== null && useFolderBrowser}
+        onClose={() => {
+          setMediaOpen(null);
+          setUseFolderBrowser(false);
+        }}
+        onSelect={(selectedMedia) => {
+          pick(selectedMedia);
+          setUseFolderBrowser(false);
+        }}
+        apiUrl={API}
+        jwt={null} // Add JWT token if you have authentication
+      />
     </form>
   );
 }

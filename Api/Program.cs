@@ -1097,7 +1097,100 @@ admin.MapDelete("/media/{id:guid}", async (Guid id, AppDb db, IS3Service s3Servi
     }
 });
 
-// Categories
+//list folders in S3
+admin.MapGet("/media/folders", async (HttpRequest req, IS3Service s3Service) =>
+{
+    var prefix = req.Query["prefix"].ToString();
+    var folders = await s3Service.ListFoldersAsync(prefix);
+    return Results.Ok(new { folders });
+});
+
+//list files in folder
+admin.MapGet("/media/folder/{*path}", async (string path, IS3Service s3Service) =>
+{
+    var files = await s3Service.ListFilesInFolderAsync(path);
+    return Results.Ok(new { files });
+});
+
+//upload to specific folder
+admin.MapPost("/media/upload/{*folderPath}", async (string folderPath, HttpRequest req, IWebHostEnvironment env, AppDb db, IS3Service s3Service) =>
+{
+    if (!req.HasFormContentType)
+        return Results.BadRequest(new { message = "Invalid form data" });
+
+    var form = await req.ReadFormAsync();
+    var file = form.Files.GetFile("file");
+    if (file is null || file.Length == 0)
+        return Results.BadRequest(new { message = "No file uploaded" });
+
+    // Validate file type and size
+    var allowedTypes = new[] { "image/jpeg", "image/png", "image/gif", "image/webp" };
+    if (!allowedTypes.Contains(file.ContentType))
+        return Results.BadRequest(new { message = "Only image files are allowed" });
+
+    if (file.Length > 10 * 1024 * 1024) // 10MB limit
+        return Results.BadRequest(new { message = "File size must be less than 10MB" });
+
+    try
+    {
+        // Option 1: AWS S3 (Production)
+        var s3BucketName = Environment.GetEnvironmentVariable("AWS_S3_BUCKET");
+        if (!string.IsNullOrEmpty(s3BucketName))
+        {
+            Console.WriteLine($"[S3] Uploading file: {file.FileName} to folder: {folderPath}");
+            var s3Url = await s3Service.UploadFileAsync(file, folderPath);
+            Console.WriteLine($"[S3] File uploaded successfully: {s3Url}");
+
+            var m = new Media
+            {
+                Id = Guid.NewGuid(),
+                FileName = file.FileName,
+                ContentType = file.ContentType,
+                Url = s3Url,
+                UploadedAt = DateTime.UtcNow
+            };
+            db.Media.Add(m);
+            await db.SaveChangesAsync();
+            return Results.Created($"/admin/media/{m.Id}", m);
+        }
+
+        // Option 2: Local file storage (Development only)
+        if (env.IsDevelopment())
+        {
+            var uploadsDir = Path.Combine(env.WebRootPath ?? env.ContentRootPath, "uploads", folderPath);
+            Directory.CreateDirectory(uploadsDir);
+
+            var fileName = $"{Guid.NewGuid()}_{file.FileName}";
+            var filePath = Path.Combine(uploadsDir, fileName);
+
+            using var stream = File.Create(filePath);
+            await file.CopyToAsync(stream);
+
+            var fileUrl = $"/uploads/{folderPath}/{fileName}";
+
+            var m = new Media
+            {
+                Id = Guid.NewGuid(),
+                FileName = file.FileName,
+                ContentType = file.ContentType,
+                Url = fileUrl,
+                UploadedAt = DateTime.UtcNow
+            };
+            db.Media.Add(m);
+            await db.SaveChangesAsync();
+            return Results.Created($"/admin/media/{m.Id}", m);
+        }
+
+        // Fallback: Return error if no storage method is configured
+        return Results.Problem("No file storage method configured. Set AWS_S3_BUCKET environment variable or run in development mode.");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Media upload error: {ex.Message}");
+        Console.WriteLine($"Stack trace: {ex.StackTrace}");
+        return Results.Problem($"Upload failed: {ex.Message}");
+    }
+});// Categories
 admin.MapGet("/category", async (AppDb db) =>
     Results.Ok(new { items = await db.Categories.OrderBy(c => c.Name).ToListAsync() }));
 

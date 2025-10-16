@@ -5,6 +5,8 @@ public interface IS3Service
 {
     Task<string> UploadFileAsync(IFormFile file, string? folder = null);
     Task<bool> DeleteFileAsync(string fileUrl);
+    Task<List<string>> ListFoldersAsync(string? prefix = null);
+    Task<List<(string Key, string Url)>> ListFilesInFolderAsync(string folderPath);
 }
 
 public class S3Service : IS3Service
@@ -61,6 +63,55 @@ public class S3Service : IS3Service
         catch
         {
             return false;
+        }
+    }
+
+    public async Task<List<string>> ListFoldersAsync(string? prefix = null)
+    {
+        try
+        {
+            var request = new ListObjectsV2Request
+            {
+                BucketName = _bucketName,
+                Prefix = prefix,
+                Delimiter = "/"
+            };
+
+            var response = await _s3Client.ListObjectsV2Async(request);
+            return response.CommonPrefixes.ToList();
+        }
+        catch
+        {
+            return new List<string>();
+        }
+    }
+
+    public async Task<List<(string Key, string Url)>> ListFilesInFolderAsync(string folderPath)
+    {
+        try
+        {
+            var request = new ListObjectsV2Request
+            {
+                BucketName = _bucketName,
+                Prefix = folderPath.EndsWith("/") ? folderPath : folderPath + "/",
+                Delimiter = "/"
+            };
+
+            var response = await _s3Client.ListObjectsV2Async(request);
+            var region = Environment.GetEnvironmentVariable("AWS_REGION") ?? "us-east-1";
+            var cloudFrontDomain = Environment.GetEnvironmentVariable("CLOUDFRONT_DOMAIN");
+
+            return response.S3Objects.Select(obj =>
+            {
+                var url = !string.IsNullOrEmpty(cloudFrontDomain)
+                    ? $"https://{cloudFrontDomain}/{obj.Key}"
+                    : $"https://{_bucketName}.s3.{region}.amazonaws.com/{obj.Key}";
+                return (obj.Key, url);
+            }).ToList();
+        }
+        catch
+        {
+            return new List<(string, string)>();
         }
     }
 }
