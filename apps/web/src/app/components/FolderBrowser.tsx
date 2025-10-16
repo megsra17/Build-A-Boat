@@ -36,6 +36,7 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
       
       if (folderRes.ok) {
         const folderData = await folderRes.json();
+        console.log('Folder API response:', folderData);
         setFolders(folderData.folders || []);
       }
 
@@ -158,15 +159,24 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-4">
-            <h2 className="text-lg font-semibold">Media Browser</h2>
+            <h2 className="text-lg font-semibold">
+              {currentPath ? `${currentPath.split('/').pop()}` : 'Media Browser'}
+            </h2>
             <div className="flex items-center gap-2 text-sm text-white/60">
-              <span>/</span>
+              <button
+                type="button"
+                onClick={() => setCurrentPath('')}
+                className="hover:text-amber-400 text-white/80"
+              >
+                Root
+              </button>
+              {currentPath && <span>/</span>}
               {currentPath.split('/').filter(Boolean).map((segment, index, array) => (
                 <React.Fragment key={index}>
                   <button
                     type="button"
                     onClick={() => navigateToFolder(array.slice(0, index + 1).join('/'))}
-                    className="hover:text-amber-400"
+                    className="hover:text-amber-400 text-white/80"
                   >
                     {segment}
                   </button>
@@ -190,14 +200,19 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
         {/* Toolbar */}
         <div className="flex items-center gap-4 mb-6 p-4 rounded-lg border border-white/10 bg-black/20">
           {currentPath && (
-            <button
-              type="button"
-              onClick={navigateUp}
-              className="inline-flex items-center gap-2 rounded-lg border border-white/20 text-white px-3 py-2 hover:bg-white/10"
-            >
-              <ArrowLeft className="size-4" />
-              Back
-            </button>
+            <div className="flex items-center gap-4">
+              <button
+                type="button"
+                onClick={navigateUp}
+                className="inline-flex items-center gap-2 rounded-lg border border-white/20 text-white px-3 py-2 hover:bg-white/10"
+              >
+                <ArrowLeft className="size-4" />
+                Back
+              </button>
+              <div className="text-sm text-white/60">
+                Current folder: <span className="text-amber-400 font-medium">{currentPath.split('/').pop()}</span>
+              </div>
+            </div>
           )}
           
           <label className="cursor-pointer inline-flex items-center gap-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-medium px-4 py-2">
@@ -276,19 +291,23 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
             <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
               
               {/* Folders */}
-              {folders.map((folder) => (
-                <button
-                  key={folder}
-                  type="button"
-                  onClick={() => navigateToFolder(folder)}
-                  className="aspect-square rounded-lg border border-white/10 hover:border-amber-400 bg-black/20 flex flex-col items-center justify-center p-4 text-center"
-                >
-                  <Folder className="size-8 text-amber-400 mb-2" />
-                  <span className="text-sm text-white/80 truncate w-full">
-                    {folder.split('/').pop()}
-                  </span>
-                </button>
-              ))}
+              {folders.map((folder) => {
+                const folderName = folder.split('/').pop() || folder;
+                console.log('Rendering folder:', folder, 'Display name:', folderName);
+                return (
+                  <button
+                    key={folder}
+                    type="button"
+                    onClick={() => navigateToFolder(folder)}
+                    className="aspect-square rounded-lg border border-white/10 hover:border-amber-400 bg-black/20 flex flex-col items-center justify-center p-4 text-center"
+                  >
+                    <Folder className="size-8 text-amber-400 mb-2" />
+                    <span className="text-sm text-white/80 truncate w-full">
+                      {folderName}
+                    </span>
+                  </button>
+                );
+              })}
 
               {/* Images */}
               {media.map((m) => (
@@ -312,8 +331,20 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
               {!loading && folders.length === 0 && media.length === 0 && (
                 <div className="col-span-full text-center text-white/60 py-12">
                   <Folder className="size-16 text-white/20 mx-auto mb-4" />
-                  <p>This folder is empty</p>
-                  <p className="text-sm mt-2">Upload images or create folders to get started</p>
+                  {currentPath ? (
+                    <>
+                      <p className="text-lg text-white/80 mb-2">
+                        Folder: <span className="text-amber-400 font-medium">{currentPath.split('/').pop()}</span>
+                      </p>
+                      <p className="text-sm mb-2">Path: /{currentPath}</p>
+                      <p className="text-sm">This folder is empty - upload images or create subfolders to get started</p>
+                    </>
+                  ) : (
+                    <>
+                      <p>No folders or media found</p>
+                      <p className="text-sm mt-2">Create folders or upload images to get started</p>
+                    </>
+                  )}
                 </div>
               )}
             </div>
