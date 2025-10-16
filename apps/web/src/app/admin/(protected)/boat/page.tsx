@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import { BoatsApi, type Boat } from "@/app/lib/admin-api";
-import {Search, Plus, RefreshCw, Copy, Trash2, Edit } from "lucide-react";
+import {Search, Plus, Eye, EyeClosed, Copy, Trash2, Edit } from "lucide-react";
 import Link from "next/link";
 
 export default function BoatsPage() {
@@ -158,7 +158,7 @@ export default function BoatsPage() {
                       title="Toggle active"
                       className="p-1.5 rounded-full border border-white/15 hover:bg-white/10"
                     >
-                      <RefreshCw className="size-4" />
+                      {b.isActive ? <Eye className="size-4" /> : <EyeClosed className="size-4" />}
                     </button>
                     <button
                       onClick={(e) => { e.stopPropagation(); openDup(b); }}
