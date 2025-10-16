@@ -37,7 +37,9 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
       if (folderRes.ok) {
         const folderData = await folderRes.json();
         console.log('Folder API response:', folderData);
-        setFolders(folderData.folders || []);
+        // Clean up folder paths - remove trailing slashes for consistency
+        const cleanFolders = (folderData.folders || []).map((folder: string) => folder.replace(/\/+$/, ''));
+        setFolders(cleanFolders);
       }
 
       // Load files in current folder
@@ -83,7 +85,9 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
   }, [isOpen, currentPath, loadCurrentDirectory]);
 
   const navigateToFolder = (folderPath: string) => {
-    setCurrentPath(folderPath.replace(/\/$/, '')); // Remove trailing slash
+    // Clean up the folder path - remove trailing slashes for consistency
+    const cleanPath = folderPath.replace(/\/+$/, '');
+    setCurrentPath(cleanPath);
   };
 
   const navigateUp = () => {
@@ -313,17 +317,26 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
                   // Don't show the current folder we're already in
                   if (!currentPath || typeof currentPath !== 'string') return true; // At root, show all folders
                   if (!folder || typeof folder !== 'string') return false; // Skip invalid folders
-                  return folder !== currentPath && !folder.startsWith(currentPath + '/');
+                  
+                  // Clean both paths for comparison
+                  const cleanCurrentPath = currentPath.replace(/\/+$/, '');
+                  const cleanFolder = folder.replace(/\/+$/, '');
+                  
+                  return cleanFolder !== cleanCurrentPath && !cleanFolder.startsWith(cleanCurrentPath + '/');
                 })
                 .map((folder) => {
                   if (!folder || typeof folder !== 'string') return null;
-                  const folderName = folder.split('/').pop() || folder || 'Unknown';
-                  console.log('Rendering folder:', folder, 'Display name:', folderName);
+                  
+                  // Clean the folder path and get just the name
+                  const cleanFolder = folder.replace(/\/+$/, '');
+                  const folderName = cleanFolder.split('/').pop() || cleanFolder || 'Unknown';
+                  
+                  console.log('Rendering folder:', cleanFolder, 'Display name:', folderName);
                   return (
                     <button
-                      key={folder}
+                      key={cleanFolder}
                       type="button"
-                      onClick={() => navigateToFolder(folder)}
+                      onClick={() => navigateToFolder(cleanFolder)}
                       className="aspect-square rounded-lg border border-white/10 hover:border-amber-400 bg-black/20 flex flex-col items-center justify-center p-4 text-center"
                     >
                       <Folder className="size-8 text-amber-400 mb-2" />
