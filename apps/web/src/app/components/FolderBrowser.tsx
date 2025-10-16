@@ -103,7 +103,18 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
       const formData = new FormData();
       formData.append('file', file);
 
-      const uploadPath = currentPath ? `${apiUrl}/admin/media/upload/${currentPath}` : `${apiUrl}/admin/media/upload`;
+      // Properly encode the folder path for the URL
+      let uploadPath;
+      if (currentPath && typeof currentPath === 'string' && currentPath.trim()) {
+        // Encode each part of the path separately to avoid issues with special characters
+        const encodedPath = currentPath.split('/').map(part => encodeURIComponent(part)).join('/');
+        uploadPath = `${apiUrl}/admin/media/upload/${encodedPath}`;
+      } else {
+        uploadPath = `${apiUrl}/admin/media/upload`;
+      }
+      
+      console.log('Upload path:', uploadPath);
+      console.log('Current path:', currentPath);
       
       const res = await fetch(uploadPath, {
         method: 'POST',
@@ -113,6 +124,7 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
 
       if (!res.ok) {
         const errorText = await res.text();
+        console.error('Upload error:', errorText);
         throw new Error(`Upload failed: ${res.status} ${errorText}`);
       }
 
@@ -123,6 +135,7 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
       onSelect(uploadedMedia);
       
     } catch (err) {
+      console.error('Upload error:', err);
       setError(err instanceof Error ? err.message : 'Upload failed');
     } finally {
       setUploading(false);
@@ -160,7 +173,7 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-4">
             <h2 className="text-lg font-semibold">
-              {currentPath ? `${currentPath.split('/').pop()}` : 'Media Browser'}
+              {currentPath && typeof currentPath === 'string' ? currentPath.split('/').pop() : 'Media Browser'}
             </h2>
             <div className="flex items-center gap-2 text-sm text-white/60">
               <button
@@ -170,19 +183,23 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
               >
                 Root
               </button>
-              {currentPath && <span>/</span>}
-              {currentPath && currentPath.split('/').filter(Boolean).map((segment, index, array) => (
-                <React.Fragment key={index}>
-                  <button
-                    type="button"
-                    onClick={() => navigateToFolder(array.slice(0, index + 1).join('/'))}
-                    className="hover:text-amber-400 text-white/80"
-                  >
-                    {segment}
-                  </button>
-                  {index < array.length - 1 && <span>/</span>}
-                </React.Fragment>
-              ))}
+              {currentPath && typeof currentPath === 'string' && (
+                <>
+                  <span>/</span>
+                  {currentPath.split('/').filter(Boolean).map((segment, index, array) => (
+                    <React.Fragment key={index}>
+                      <button
+                        type="button"
+                        onClick={() => navigateToFolder(array.slice(0, index + 1).join('/'))}
+                        className="hover:text-amber-400 text-white/80"
+                      >
+                        {segment}
+                      </button>
+                      {index < array.length - 1 && <span>/</span>}
+                    </React.Fragment>
+                  ))}
+                </>
+              )}
             </div>
           </div>
           <button type="button" onClick={onClose} className="size-8 rounded-full border border-white/20 hover:bg-white/10">
@@ -199,7 +216,7 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
 
         {/* Toolbar */}
         <div className="flex items-center gap-4 mb-6 p-4 rounded-lg border border-white/10 bg-black/20">
-          {currentPath && (
+          {currentPath && typeof currentPath === 'string' && (
             <div className="flex items-center gap-4">
               <button
                 type="button"
@@ -294,11 +311,13 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
               {folders
                 .filter(folder => {
                   // Don't show the current folder we're already in
-                  if (!currentPath) return true; // At root, show all folders
+                  if (!currentPath || typeof currentPath !== 'string') return true; // At root, show all folders
+                  if (!folder || typeof folder !== 'string') return false; // Skip invalid folders
                   return folder !== currentPath && !folder.startsWith(currentPath + '/');
                 })
                 .map((folder) => {
-                  const folderName = folder?.split('/').pop() || folder || 'Unknown';
+                  if (!folder || typeof folder !== 'string') return null;
+                  const folderName = folder.split('/').pop() || folder || 'Unknown';
                   console.log('Rendering folder:', folder, 'Display name:', folderName);
                   return (
                     <button
@@ -313,7 +332,8 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
                       </span>
                     </button>
                   );
-                })}
+                })
+                .filter(Boolean)}
 
               {/* Images */}
               {media.map((m) => (
@@ -337,7 +357,7 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
               {!loading && folders.length === 0 && media.length === 0 && (
                 <div className="col-span-full text-center text-white/60 py-12">
                   <Folder className="size-16 text-white/20 mx-auto mb-4" />
-                  {currentPath ? (
+                  {currentPath && typeof currentPath === 'string' ? (
                     <>
                       <p className="text-lg text-white/80 mb-2">
                         Folder: <span className="text-amber-400 font-medium">{currentPath.split('/').pop()}</span>
