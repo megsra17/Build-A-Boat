@@ -132,55 +132,20 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
     if (!newFolderName.trim()) return;
     
     setError(null);
-    setUploading(true);
     
     try {
-      // Create a folder by uploading a small transparent PNG image
-      // S3 doesn't have true folders, so we create a placeholder image to establish the folder
+      // For S3, folders are just path prefixes, so we can navigate to the folder immediately
+      // The folder will be created when the first file is uploaded to it
       const folderPath = currentPath ? `${currentPath}/${newFolderName.trim()}` : newFolderName.trim();
       
-      // Create a 1x1 transparent PNG image as a placeholder
-      const canvas = document.createElement('canvas');
-      canvas.width = 1;
-      canvas.height = 1;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.clearRect(0, 0, 1, 1); // Transparent pixel
-      }
-      
-      // Convert canvas to blob
-      const placeholderBlob = await new Promise<Blob>((resolve) => {
-        canvas.toBlob((blob) => {
-          resolve(blob || new Blob());
-        }, 'image/png');
-      });
-      
-      const formData = new FormData();
-      formData.append('file', placeholderBlob, '.folder-placeholder.png');
-
-      const uploadPath = `${apiUrl}/admin/media/upload/${folderPath}`;
-      
-      const res = await fetch(uploadPath, {
-        method: 'POST',
-        headers: jwt ? { Authorization: `Bearer ${jwt}` } : {},
-        body: formData,
-      });
-
-      if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error(`Failed to create folder: ${res.status} ${errorText}`);
-      }
-
-      // Reload the current directory to show the new folder
-      await loadCurrentDirectory();
+      // Navigate to the new folder path
+      setCurrentPath(folderPath);
       
       setNewFolderName('');
       setShowNewFolder(false);
       
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create folder');
-    } finally {
-      setUploading(false);
     }
   };
 
@@ -278,15 +243,14 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
                 }}
                 className="flex-1 rounded-md bg-black/40 border border-white/15 px-3 py-2 outline-none"
                 autoFocus
-                disabled={uploading}
               />
               <button
                 type="button"
                 onClick={createFolder}
-                disabled={uploading || !newFolderName.trim()}
+                disabled={!newFolderName.trim()}
                 className="px-3 py-2 bg-amber-500 text-black rounded-md hover:bg-amber-400 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {uploading ? "Creating..." : "Create"}
+                Create
               </button>
               <button
                 type="button"
@@ -294,8 +258,7 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
                   setShowNewFolder(false);
                   setNewFolderName('');
                 }}
-                disabled={uploading}
-                className="px-3 py-2 border border-white/20 rounded-md hover:bg-white/10 disabled:opacity-50"
+                className="px-3 py-2 border border-white/20 rounded-md hover:bg-white/10"
               >
                 Cancel
               </button>
