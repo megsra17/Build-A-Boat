@@ -152,6 +152,7 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
               {currentPath.split('/').filter(Boolean).map((segment, index, array) => (
                 <React.Fragment key={index}>
                   <button
+                    type="button"
                     onClick={() => navigateToFolder(array.slice(0, index + 1).join('/'))}
                     className="hover:text-amber-400"
                   >
@@ -162,7 +163,7 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
               ))}
             </div>
           </div>
-          <button onClick={onClose} className="size-8 rounded-full border border-white/20 hover:bg-white/10">
+          <button type="button" onClick={onClose} className="size-8 rounded-full border border-white/20 hover:bg-white/10">
             ×
           </button>
         </div>
@@ -178,6 +179,7 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
         <div className="flex items-center gap-4 mb-6 p-4 rounded-lg border border-white/10 bg-black/20">
           {currentPath && (
             <button
+              type="button"
               onClick={navigateUp}
               className="inline-flex items-center gap-2 rounded-lg border border-white/20 text-white px-3 py-2 hover:bg-white/10"
             >
@@ -199,6 +201,7 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
           </label>
 
           <button
+            type="button"
             onClick={() => setShowNewFolder(true)}
             className="inline-flex items-center gap-2 rounded-lg border border-amber-500/40 text-amber-300 px-3 py-2 hover:bg-amber-500/10"
           >
@@ -221,12 +224,14 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
                 autoFocus
               />
               <button
+                type="button"
                 onClick={createFolder}
                 className="px-3 py-2 bg-amber-500 text-black rounded-md hover:bg-amber-400"
               >
                 Create
               </button>
               <button
+                type="button"
                 onClick={() => setShowNewFolder(false)}
                 className="px-3 py-2 border border-white/20 rounded-md hover:bg-white/10"
               >
@@ -249,6 +254,7 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
               {folders.map((folder) => (
                 <button
                   key={folder}
+                  type="button"
                   onClick={() => navigateToFolder(folder)}
                   className="aspect-square rounded-lg border border-white/10 hover:border-amber-400 bg-black/20 flex flex-col items-center justify-center p-4 text-center"
                 >
@@ -263,6 +269,7 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
               {media.map((m) => (
                 <button
                   key={m.Id}
+                  type="button"
                   onClick={() => onSelect(m)}
                   className="aspect-square rounded-lg border border-white/10 hover:border-amber-400 overflow-hidden"
                   title={m.label ?? ''}
