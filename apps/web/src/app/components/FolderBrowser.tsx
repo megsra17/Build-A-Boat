@@ -155,6 +155,12 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
       if (!res.ok) {
         const errorText = await res.text();
         console.error('Upload error:', errorText);
+        
+        // If both folder and regular uploads fail, suggest using the simple media picker
+        if (res.status === 500) {
+          throw new Error(`Upload failed: Database error. Try using the simple media picker instead of the folder browser, or check S3 permissions.`);
+        }
+        
         throw new Error(`Upload failed: ${res.status} ${errorText}`);
       }
 
@@ -243,8 +249,20 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
 
         {/* Error Display */}
         {error && (
-          <div className="mb-4 p-3 bg-red-600/20 border border-red-600 text-red-300 rounded">
-            {error}
+          <div className="mb-4 p-4 bg-red-600/20 border border-red-600 text-red-300 rounded-lg">
+            <p className="font-medium mb-2">Upload Error</p>
+            <p className="text-sm mb-3">{error}</p>
+            {error.includes('Database error') && (
+              <div className="text-xs text-red-200 bg-red-900/30 p-3 rounded">
+                <p className="font-medium mb-1">Quick Fix Options:</p>
+                <ul className="list-disc list-inside space-y-1">
+                  <li>Use the simple media picker (non-folder) for now</li>
+                  <li>Check S3 bucket permissions for public read access</li>
+                  <li>Check CloudFront distribution settings</li>
+                  <li>Verify database connection and constraints</li>
+                </ul>
+              </div>
+            )}
           </div>
         )}
 
