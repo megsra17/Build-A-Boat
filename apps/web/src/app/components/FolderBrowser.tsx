@@ -171,7 +171,7 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
                 Root
               </button>
               {currentPath && <span>/</span>}
-              {currentPath.split('/').filter(Boolean).map((segment, index, array) => (
+              {currentPath && currentPath.split('/').filter(Boolean).map((segment, index, array) => (
                 <React.Fragment key={index}>
                   <button
                     type="button"
@@ -210,7 +210,7 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
                 Back
               </button>
               <div className="text-sm text-white/60">
-                Current folder: <span className="text-amber-400 font-medium">{currentPath.split('/').pop()}</span>
+                Current folder: <span className="text-amber-400 font-medium">{currentPath.split('/').pop() || currentPath}</span>
               </div>
             </div>
           )}
@@ -291,23 +291,29 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
             <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
               
               {/* Folders */}
-              {folders.map((folder) => {
-                const folderName = folder.split('/').pop() || folder;
-                console.log('Rendering folder:', folder, 'Display name:', folderName);
-                return (
-                  <button
-                    key={folder}
-                    type="button"
-                    onClick={() => navigateToFolder(folder)}
-                    className="aspect-square rounded-lg border border-white/10 hover:border-amber-400 bg-black/20 flex flex-col items-center justify-center p-4 text-center"
-                  >
-                    <Folder className="size-8 text-amber-400 mb-2" />
-                    <span className="text-sm text-white/80 truncate w-full">
-                      {folderName}
-                    </span>
-                  </button>
-                );
-              })}
+              {folders
+                .filter(folder => {
+                  // Don't show the current folder we're already in
+                  if (!currentPath) return true; // At root, show all folders
+                  return folder !== currentPath && !folder.startsWith(currentPath + '/');
+                })
+                .map((folder) => {
+                  const folderName = folder?.split('/').pop() || folder || 'Unknown';
+                  console.log('Rendering folder:', folder, 'Display name:', folderName);
+                  return (
+                    <button
+                      key={folder}
+                      type="button"
+                      onClick={() => navigateToFolder(folder)}
+                      className="aspect-square rounded-lg border border-white/10 hover:border-amber-400 bg-black/20 flex flex-col items-center justify-center p-4 text-center"
+                    >
+                      <Folder className="size-8 text-amber-400 mb-2" />
+                      <span className="text-sm text-white/80 truncate w-full">
+                        {folderName}
+                      </span>
+                    </button>
+                  );
+                })}
 
               {/* Images */}
               {media.map((m) => (
