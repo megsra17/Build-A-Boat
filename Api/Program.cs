@@ -1086,7 +1086,7 @@ admin.MapDelete("/media/{id:guid}", async (Guid id, AppDb db, IS3Service s3Servi
         // Remove from database
         db.Media.Remove(media);
         await db.SaveChangesAsync();
-        
+
         Console.WriteLine($"[DB] Deleted media record: {media.Id}");
         return Results.NoContent();
     }

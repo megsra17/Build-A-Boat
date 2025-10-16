@@ -42,7 +42,7 @@ public class S3Service : IS3Service
         {
             return $"https://{cloudFrontDomain}/{key}";
         }
-        
+
         // Fallback to direct S3 URL
         var region = Environment.GetEnvironmentVariable("AWS_REGION") ?? "us-east-1";
         return $"https://{_bucketName}.s3.{region}.amazonaws.com/{key}";

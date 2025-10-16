@@ -87,8 +87,10 @@ export default function NewBoatPage() {
           headers: jwt ?{Authorization: `Bearer ${jwt}`} : {},
         });
         if(!res.ok) throw new Error(`Failed to load media: ${res.status}`);
-        const data = await res.json() as Media[]; 
-        setMedia(data);
+        const data = await res.json();
+        // Handle both direct array and { items: [...] } response formats
+        const mediaArray = Array.isArray(data) ? data : (data.items || []);
+        setMedia(mediaArray);
       } catch (error) {
         setErr(error instanceof Error ? error.message : String(error));
       }
@@ -101,7 +103,9 @@ export default function NewBoatPage() {
       const jwt = localStorage.getItem("jwt") || sessionStorage.getItem("jwt");
       const res = await fetch(`${API}/admin/category`, { headers: jwt ? { Authorization: `Bearer ${jwt}` } : {} });
       if (!res.ok) return;
-      setCategories(await res.json());
+      const data = await res.json();
+      // API returns { items: [...] }, so we need to extract the items array
+      setCategories(data.items || []);
     }catch{}
   })();
 }, []);
