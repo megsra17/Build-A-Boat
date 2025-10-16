@@ -50,14 +50,18 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
         
         if (fileRes.ok) {
           const fileData = await fileRes.json();
+          console.log('Files in folder:', fileData);
           
           // Convert to Media format
-          const mediaItems: Media[] = fileData.files.map((file: { Key: string; Url: string }) => ({
+          const mediaItems: Media[] = (fileData.files || []).map((file: { Key: string; Url: string }) => ({
             Id: file.Key,
             Url: file.Url,
             label: file.Key.split('/').pop()
           }));
           setMedia(mediaItems);
+        } else {
+          console.error('Failed to load folder files:', fileRes.status);
+          setMedia([]);
         }
       } else {
         // Root level - load all media for backward compatibility
@@ -68,7 +72,11 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
         if (mediaRes.ok) {
           const mediaData = await mediaRes.json();
           const mediaArray = Array.isArray(mediaData) ? mediaData : (mediaData.items || []);
+          console.log('Root media loaded:', mediaArray.length, 'items');
           setMedia(mediaArray);
+        } else {
+          console.error('Failed to load root media:', mediaRes.status);
+          setMedia([]);
         }
       }
     } catch (err) {
@@ -106,25 +114,43 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
     try {
       const formData = new FormData();
       formData.append('file', file);
-
-      // Properly encode the folder path for the URL
+      
+      // Try the folder-specific endpoint first, fall back to regular upload if it fails
       let uploadPath;
+      let useRegularUpload = false;
+      
       if (currentPath && typeof currentPath === 'string' && currentPath.trim()) {
-        // Encode each part of the path separately to avoid issues with special characters
+        // Try folder-specific upload first
         const encodedPath = currentPath.split('/').map(part => encodeURIComponent(part)).join('/');
         uploadPath = `${apiUrl}/admin/media/upload/${encodedPath}`;
       } else {
         uploadPath = `${apiUrl}/admin/media/upload`;
+        useRegularUpload = true;
       }
       
       console.log('Upload path:', uploadPath);
       console.log('Current path:', currentPath);
       
-      const res = await fetch(uploadPath, {
+      let res = await fetch(uploadPath, {
         method: 'POST',
         headers: jwt ? { Authorization: `Bearer ${jwt}` } : {},
         body: formData,
       });
+
+      // If folder upload fails with 500, try regular upload
+      if (!res.ok && !useRegularUpload && res.status === 500) {
+        console.log('Folder upload failed, trying regular upload...');
+        
+        // Create new FormData for retry
+        const retryFormData = new FormData();
+        retryFormData.append('file', file);
+        
+        res = await fetch(`${apiUrl}/admin/media/upload`, {
+          method: 'POST',
+          headers: jwt ? { Authorization: `Bearer ${jwt}` } : {},
+          body: retryFormData,
+        });
+      }
 
       if (!res.ok) {
         const errorText = await res.text();
@@ -133,10 +159,14 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
       }
 
       const uploadedMedia = await res.json();
+      console.log('Upload successful:', uploadedMedia);
       
       // Add to current media list and auto-select
       setMedia(prev => [uploadedMedia, ...prev]);
       onSelect(uploadedMedia);
+      
+      // Reload the directory to refresh the view
+      await loadCurrentDirectory();
       
     } catch (err) {
       console.error('Upload error:', err);
