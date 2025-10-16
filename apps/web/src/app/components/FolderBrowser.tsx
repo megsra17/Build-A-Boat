@@ -131,10 +131,43 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
   const createFolder = async () => {
     if (!newFolderName.trim()) return;
     
-    // For now, we'll create a folder by uploading a placeholder file
-    // In a full implementation, you might want a dedicated folder creation endpoint
-    setNewFolderName('');
-    setShowNewFolder(false);
+    setError(null);
+    setUploading(true);
+    
+    try {
+      // Create a folder by uploading a placeholder file
+      // S3 doesn't have true folders, so we create a .keep file to establish the folder
+      const folderPath = currentPath ? `${currentPath}/${newFolderName.trim()}` : newFolderName.trim();
+      
+      // Create a simple text file as a placeholder
+      const placeholderContent = new Blob(['This folder was created on ' + new Date().toISOString()], { type: 'text/plain' });
+      const formData = new FormData();
+      formData.append('file', placeholderContent, '.keep');
+
+      const uploadPath = `${apiUrl}/admin/media/upload/${folderPath}`;
+      
+      const res = await fetch(uploadPath, {
+        method: 'POST',
+        headers: jwt ? { Authorization: `Bearer ${jwt}` } : {},
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`Failed to create folder: ${res.status} ${errorText}`);
+      }
+
+      // Reload the current directory to show the new folder
+      await loadCurrentDirectory();
+      
+      setNewFolderName('');
+      setShowNewFolder(false);
+      
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create folder');
+    } finally {
+      setUploading(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -220,20 +253,35 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
                 placeholder="Folder name..."
                 value={newFolderName}
                 onChange={(e) => setNewFolderName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    createFolder();
+                  }
+                  if (e.key === 'Escape') {
+                    setShowNewFolder(false);
+                  }
+                }}
                 className="flex-1 rounded-md bg-black/40 border border-white/15 px-3 py-2 outline-none"
                 autoFocus
+                disabled={uploading}
               />
               <button
                 type="button"
                 onClick={createFolder}
-                className="px-3 py-2 bg-amber-500 text-black rounded-md hover:bg-amber-400"
+                disabled={uploading || !newFolderName.trim()}
+                className="px-3 py-2 bg-amber-500 text-black rounded-md hover:bg-amber-400 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Create
+                {uploading ? "Creating..." : "Create"}
               </button>
               <button
                 type="button"
-                onClick={() => setShowNewFolder(false)}
-                className="px-3 py-2 border border-white/20 rounded-md hover:bg-white/10"
+                onClick={() => {
+                  setShowNewFolder(false);
+                  setNewFolderName('');
+                }}
+                disabled={uploading}
+                className="px-3 py-2 border border-white/20 rounded-md hover:bg-white/10 disabled:opacity-50"
               >
                 Cancel
               </button>
