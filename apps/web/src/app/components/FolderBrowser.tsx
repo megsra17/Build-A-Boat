@@ -135,14 +135,28 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
     setUploading(true);
     
     try {
-      // Create a folder by uploading a placeholder file
-      // S3 doesn't have true folders, so we create a .keep file to establish the folder
+      // Create a folder by uploading a small transparent PNG image
+      // S3 doesn't have true folders, so we create a placeholder image to establish the folder
       const folderPath = currentPath ? `${currentPath}/${newFolderName.trim()}` : newFolderName.trim();
       
-      // Create a simple text file as a placeholder
-      const placeholderContent = new Blob(['This folder was created on ' + new Date().toISOString()], { type: 'text/plain' });
+      // Create a 1x1 transparent PNG image as a placeholder
+      const canvas = document.createElement('canvas');
+      canvas.width = 1;
+      canvas.height = 1;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.clearRect(0, 0, 1, 1); // Transparent pixel
+      }
+      
+      // Convert canvas to blob
+      const placeholderBlob = await new Promise<Blob>((resolve) => {
+        canvas.toBlob((blob) => {
+          resolve(blob || new Blob());
+        }, 'image/png');
+      });
+      
       const formData = new FormData();
-      formData.append('file', placeholderContent, '.keep');
+      formData.append('file', placeholderBlob, '.folder-placeholder.png');
 
       const uploadPath = `${apiUrl}/admin/media/upload/${folderPath}`;
       
