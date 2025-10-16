@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import {useRouter} from "next/navigation";
 import {Plus, Check, Folder} from "lucide-react";
-import FolderBrowser from "../components/FolderBrowser";
+import FolderBrowser from "../../../../components/FolderBrowser";
 
 // Use Railway URL for production, localhost for development
 const API = process.env.NODE_ENV === 'production' 
@@ -49,6 +49,7 @@ export default function NewBoatPage() {
   const [uploading, setUploading] = useState(false);
   const [dragTarget, setDragTarget] = useState<string | null>(null);
   const [useFolderBrowser, setUseFolderBrowser] = useState(false);
+  const [jwt, setJwt] = useState<string | null>(null);
 
   // Fetch next available slug number
   useEffect(() => {
@@ -112,6 +113,12 @@ export default function NewBoatPage() {
     }catch{}
   })();
 }, []);
+
+  // Initialize JWT token for FolderBrowser
+  useEffect(() => {
+    const token = typeof window !== "undefined" ? localStorage.getItem("jwt") || sessionStorage.getItem("jwt") : null;
+    setJwt(token);
+  }, []);
 
   function removeLayer(i: number){
     setLayers(l => l.filter((_, idx) => idx !== i));
@@ -554,7 +561,7 @@ export default function NewBoatPage() {
           setUseFolderBrowser(false);
         }}
         apiUrl={API}
-        jwt={null} // Add JWT token if you have authentication
+        jwt={jwt}
       />
     </form>
   );
