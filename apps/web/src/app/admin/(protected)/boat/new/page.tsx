@@ -27,7 +27,6 @@ export default function NewBoatPage() {
   const [categories, setCategories] = useState<{id: string, slug: string, name: string}[]>([]);
   const [selectedCategory, setSelectedCategory] = useState("");
   const [featDraft, setFeatDraft] = useState("");
-  const [features, setFeatures] = useState<string[]>([]);
   const [nextSlugNumber, setNextSlugNumber] = useState<number>(0);
 
   //images (store media Ids or Urls)
@@ -46,6 +45,7 @@ export default function NewBoatPage() {
   const [media, setMedia] = useState<Media[]>([]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   // Fetch next available slug number
   useEffect(() => {
@@ -110,20 +110,60 @@ export default function NewBoatPage() {
   })();
 }, []);
 
-
-  function addFeature() {
-    const val = featDraft.trim();
-    if(!val) return;
-    setFeatures(f => Array.from(new Set([...f, val])));
-    setFeatDraft("");
-  }
-
-  function removeFeature(f: string) {
-    setFeatures(fs => fs.filter(x => x !== f));
-  }
-
   function removeLayer(i: number){
     setLayers(l => l.filter((_, idx) => idx !== i));
+  }
+
+  async function uploadMedia(file: File) {
+    setUploading(true);
+    setErr(null);
+    try {
+      const jwt = typeof window !== "undefined" ? localStorage.getItem("jwt") || sessionStorage.getItem("jwt") : null;
+      
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch(`${API}/admin/media/upload`, {
+        method: "POST",
+        headers: jwt ? { Authorization: `Bearer ${jwt}` } : {},
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`Upload failed: ${res.status} ${errorText}`);
+      }
+
+      const uploadedMedia = await res.json();
+      
+      // Add the new media to the list
+      setMedia(prev => [uploadedMedia, ...prev]);
+      
+      return uploadedMedia;
+    } catch (error) {
+      console.error("Upload error:", error);
+      setErr(error instanceof Error ? error.message : String(error));
+      throw error;
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  function handleFileUpload(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Reset the input
+    event.target.value = '';
+
+    uploadMedia(file)
+      .then((uploadedMedia) => {
+        // Automatically select the uploaded image
+        if (mediaOpen) {
+          pick(uploadedMedia);
+        }
+      })
+      .catch(console.error);
   }
 
   async function submit(e: React.FormEvent) {
@@ -138,7 +178,6 @@ export default function NewBoatPage() {
         Name: name,
         BasePrice: typeof msrp === "number" ? msrp : Number(msrp || 0),
         ModelYear: typeof modelYear === "number" ? modelYear : Number(modelYear || 0),
-        Features: features,
         PrimaryImageUrl: primary?.Url ?? null,
         SecondaryImageUrl: secondary?.Url ?? null,
         SideImageUrl: side?.Url ?? null,
@@ -184,6 +223,7 @@ export default function NewBoatPage() {
       setter(m);
     }
     setMediaOpen(null);
+    setErr(null); // Clear any upload errors
   }
   return (
     <form onSubmit={submit} className="space-y-8">
@@ -241,46 +281,9 @@ export default function NewBoatPage() {
         </div>
       </section>
 
-      {/* Features + Images */}
+      {/* Images */}
       <section className="rounded-xl border border-white/10 bg-[#151515] p-6">
-        <h2 className="text-xl font-semibold">General Images/Features</h2>
-
-        <div className="mt-6">
-          <label className="block text-sm text-white/70 mb-2">Features</label>
-          <div className="flex items-center gap-2">
-            <input
-              value={featDraft}
-              onChange={(e) => setFeatDraft(e.target.value)}
-              placeholder="Add a feature…"
-              className="w-72 rounded-md bg-black/40 border border-white/15 px-3 py-2 outline-none"
-            />
-            <button
-              type="button"
-              onClick={addFeature}
-              className="inline-flex items-center gap-1 rounded-full border border-amber-500/40 text-amber-300 px-3 py-1 hover:bg-amber-500/10"
-            >
-              <Plus className="size-4" />
-              Add
-            </button>
-          </div>
-
-          {!!features.length && (
-            <div className="mt-3 flex flex-wrap gap-2">
-              {features.map((f) => (
-                <button
-                  key={f}
-                  type="button"
-                  onClick={() => removeFeature(f)}
-                  className="rounded-full bg-white/5 border border-white/10 px-3 py-1 text-sm hover:bg-white/10"
-                  title="Remove"
-                >
-                  {f}
-                  <span className="ml-2 opacity-70">×</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        <h2 className="text-xl font-semibold">General Images</h2>
 
         <div className="mt-8 grid grid-cols-1 md:grid-cols-4 gap-6">
           {([
@@ -365,10 +368,46 @@ export default function NewBoatPage() {
                 ×
               </button>
             </div>
+            
+            {/* Error Display */}
+            {err && (
+              <div className="mb-4 p-3 bg-red-600/20 border border-red-600 text-red-300 rounded">
+                {err}
+              </div>
+            )}
+            
+            {/* Upload Section */}
+            <div className="mb-6 p-4 rounded-lg border border-white/10 bg-black/20">
+              <div className="flex items-center gap-4">
+                <label className="cursor-pointer inline-flex items-center gap-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-medium px-4 py-2 disabled:opacity-50">
+                  <Plus className="size-4" />
+                  {uploading ? "Uploading..." : "Upload New Image"}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileUpload}
+                    disabled={uploading}
+                    className="hidden"
+                  />
+                </label>
+                <span className="text-sm text-white/60">
+                  Select an image file to upload (JPEG, PNG, GIF, WebP - max 10MB)
+                </span>
+              </div>
+            </div>
+
             <div className="grid grid-cols-2 md:grid-cols-6 gap-4 max-h-[65vh] overflow-auto">
-              {media.length === 0 && (
+              {media.length === 0 && !uploading && (
                 <div className="col-span-full text-center text-white/60">
-                  No media found. (Add a `/api/admin/media` endpoint or seed media.)
+                  No media found. Upload an image above to get started.
+                </div>
+              )}
+              {uploading && (
+                <div className="col-span-full text-center text-white/60">
+                  <div className="inline-flex items-center gap-2">
+                    <div className="animate-spin size-4 border-2 border-amber-500 border-t-transparent rounded-full"></div>
+                    Uploading image...
+                  </div>
                 </div>
               )}
               {media.map((m) => (
