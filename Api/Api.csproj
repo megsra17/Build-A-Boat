@@ -7,6 +7,8 @@
         <AssemblyName>Api</AssemblyName>
     </PropertyGroup>
     <ItemGroup>
+        <PackageReference Include="AWSSDK.Extensions.NETCore.Setup" Version="4.0.3.6" />
+        <PackageReference Include="AWSSDK.S3" Version="4.0.7.11" />
         <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
         <PackageReference Include="DotNetEnv" Version="3.1.1" />
         <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.9" />

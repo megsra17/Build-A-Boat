@@ -11,6 +11,8 @@ using System.IdentityModel.Tokens.Jwt;
 using BCrypt.Net;
 using Microsoft.AspNetCore.Identity.Data;
 using DotNetEnv;
+using Amazon.S3;
+using Amazon.Extensions.NETCore.Setup;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -96,6 +98,10 @@ builder.Services.AddScoped<ConstraintEngine>();
 
 // Add email service
 builder.Services.AddScoped<IEmailService, EmailService>();
+
+// Add AWS S3 service
+builder.Services.AddAWSService<IAmazonS3>();
+builder.Services.AddScoped<IS3Service, S3Service>();
 
 // Configure JSON serialization to handle circular references
 builder.Services.ConfigureHttpJsonOptions(options =>
@@ -346,6 +352,13 @@ Console.WriteLine($"Starting server on port: {port}");
 app.Urls.Add($"http://0.0.0.0:{port}");
 
 app.UseCors();
+
+// Serve static files for development (uploaded images)
+if (app.Environment.IsDevelopment())
+{
+    app.UseStaticFiles();
+}
+
 app.UseAuthentication();
 app.UseAuthorization();
 
@@ -960,7 +973,7 @@ admin.MapPost("/media", async (MediaCreateDto dto, AppDb db) =>
 });
 
 //upload media
-admin.MapPost("/media/upload", async (HttpRequest req, IWebHostEnvironment env, AppDb db) =>
+admin.MapPost("/media/upload", async (HttpRequest req, IWebHostEnvironment env, AppDb db, IS3Service s3Service) =>
 {
     if (!req.HasFormContentType)
         return Results.BadRequest(new { message = "Invalid form data" });
@@ -970,19 +983,118 @@ admin.MapPost("/media/upload", async (HttpRequest req, IWebHostEnvironment env, 
     if (file is null || file.Length == 0)
         return Results.BadRequest(new { message = "No file uploaded" });
 
-    //TODO In production, you would upload to S3 or another storage service
-    // Here we just simulate by saving metadata to the database
-    var m = new Media
+    // Validate file type and size
+    var allowedTypes = new[] { "image/jpeg", "image/png", "image/gif", "image/webp" };
+    if (!allowedTypes.Contains(file.ContentType))
+        return Results.BadRequest(new { message = "Only image files are allowed" });
+
+    if (file.Length > 10 * 1024 * 1024) // 10MB limit
+        return Results.BadRequest(new { message = "File size must be less than 10MB" });
+
+    try
     {
-        Id = Guid.NewGuid(),
-        FileName = file.FileName,
-        ContentType = file.ContentType,
-        Url = $"https://example.com/media/{Guid.NewGuid()}/{file.FileName}", // Placeholder URL
-        UploadedAt = DateTime.UtcNow
-    };
-    db.Media.Add(m);
-    await db.SaveChangesAsync();
-    return Results.Created($"/admin/media/{m.Id}", m);
+        // Option 1: AWS S3 (Production)
+        var s3BucketName = Environment.GetEnvironmentVariable("AWS_S3_BUCKET");
+        if (!string.IsNullOrEmpty(s3BucketName))
+        {
+            Console.WriteLine($"[S3] Uploading file: {file.FileName}");
+            var s3Url = await s3Service.UploadFileAsync(file, "media");
+            Console.WriteLine($"[S3] File uploaded successfully: {s3Url}");
+
+            var m = new Media
+            {
+                Id = Guid.NewGuid(),
+                FileName = file.FileName,
+                ContentType = file.ContentType,
+                Url = s3Url,
+                UploadedAt = DateTime.UtcNow
+            };
+            db.Media.Add(m);
+            await db.SaveChangesAsync();
+            return Results.Created($"/admin/media/{m.Id}", m);
+        }
+
+        // Option 2: Local file storage (Development only)
+        if (env.IsDevelopment())
+        {
+            var uploadsDir = Path.Combine(env.WebRootPath ?? env.ContentRootPath, "uploads");
+            Directory.CreateDirectory(uploadsDir);
+
+            var fileName = $"{Guid.NewGuid()}_{file.FileName}";
+            var filePath = Path.Combine(uploadsDir, fileName);
+
+            using var stream = File.Create(filePath);
+            await file.CopyToAsync(stream);
+
+            var fileUrl = $"/uploads/{fileName}";
+
+            var m = new Media
+            {
+                Id = Guid.NewGuid(),
+                FileName = file.FileName,
+                ContentType = file.ContentType,
+                Url = fileUrl,
+                UploadedAt = DateTime.UtcNow
+            };
+            db.Media.Add(m);
+            await db.SaveChangesAsync();
+            return Results.Created($"/admin/media/{m.Id}", m);
+        }
+
+        // Fallback: Return error if no storage method is configured
+        return Results.Problem("No file storage method configured. Set AWS_S3_BUCKET environment variable or run in development mode.");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Media upload error: {ex.Message}");
+        Console.WriteLine($"Stack trace: {ex.StackTrace}");
+        return Results.Problem($"Upload failed: {ex.Message}");
+    }
+});
+
+//delete media
+admin.MapDelete("/media/{id:guid}", async (Guid id, AppDb db, IS3Service s3Service) =>
+{
+    var media = await db.Media.FindAsync(id);
+    if (media is null) return Results.NotFound();
+
+    try
+    {
+        // Delete from S3 if it's an S3 URL
+        var s3BucketName = Environment.GetEnvironmentVariable("AWS_S3_BUCKET");
+        if (!string.IsNullOrEmpty(s3BucketName) && media.Url.Contains(s3BucketName))
+        {
+            Console.WriteLine($"[S3] Deleting file: {media.Url}");
+            var deleted = await s3Service.DeleteFileAsync(media.Url);
+            if (!deleted)
+            {
+                Console.WriteLine($"[S3] Warning: Failed to delete file from S3: {media.Url}");
+            }
+        }
+        else if (media.Url.StartsWith("/uploads/"))
+        {
+            // Delete local file if it exists
+            var fileName = media.Url.Replace("/uploads/", "");
+            var filePath = Path.Combine("uploads", fileName);
+            if (File.Exists(filePath))
+            {
+                File.Delete(filePath);
+                Console.WriteLine($"[LOCAL] Deleted local file: {filePath}");
+            }
+        }
+
+        // Remove from database
+        db.Media.Remove(media);
+        await db.SaveChangesAsync();
+        
+        Console.WriteLine($"[DB] Deleted media record: {media.Id}");
+        return Results.NoContent();
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Delete media error: {ex.Message}");
+        return Results.Problem($"Delete failed: {ex.Message}");
+    }
 });
 
 // Categories
