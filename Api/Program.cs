@@ -1001,6 +1001,12 @@ admin.MapPost("/media/upload", async (HttpRequest req, IWebHostEnvironment env, 
             var s3Url = await s3Service.UploadFileAsync(file, "media");
             Console.WriteLine($"[S3] File uploaded successfully: {s3Url}");
 
+            if (string.IsNullOrEmpty(s3Url))
+            {
+                Console.WriteLine("[S3] ERROR: S3 service returned empty URL");
+                return Results.Problem("S3 upload returned empty URL");
+            }
+
             var m = new Media
             {
                 Id = Guid.NewGuid(),
@@ -1009,8 +1015,20 @@ admin.MapPost("/media/upload", async (HttpRequest req, IWebHostEnvironment env, 
                 Url = s3Url,
                 UploadedAt = DateTime.UtcNow
             };
-            db.Media.Add(m);
-            await db.SaveChangesAsync();
+
+            try
+            {
+                db.Media.Add(m);
+                await db.SaveChangesAsync();
+                Console.WriteLine($"[S3] Media saved to database with ID: {m.Id}");
+            }
+            catch (Exception dbEx)
+            {
+                Console.WriteLine($"Database save error: {dbEx.Message}");
+                Console.WriteLine($"Database save inner exception: {dbEx.InnerException?.Message}");
+                throw;
+            }
+
             return Results.Created($"/admin/media/{m.Id}", m);
         }
 
@@ -1141,6 +1159,12 @@ admin.MapPost("/media/upload/{*folderPath}", async (string folderPath, HttpReque
             var s3Url = await s3Service.UploadFileAsync(file, folderPath);
             Console.WriteLine($"[S3] File uploaded successfully: {s3Url}");
 
+            if (string.IsNullOrEmpty(s3Url))
+            {
+                Console.WriteLine("[S3] ERROR: S3 service returned empty URL for folder upload");
+                return Results.Problem("S3 upload returned empty URL");
+            }
+
             var m = new Media
             {
                 Id = Guid.NewGuid(),
@@ -1149,8 +1173,20 @@ admin.MapPost("/media/upload/{*folderPath}", async (string folderPath, HttpReque
                 Url = s3Url,
                 UploadedAt = DateTime.UtcNow
             };
-            db.Media.Add(m);
-            await db.SaveChangesAsync();
+
+            try
+            {
+                db.Media.Add(m);
+                await db.SaveChangesAsync();
+                Console.WriteLine($"[S3] Media saved to database with ID: {m.Id}");
+            }
+            catch (Exception dbEx)
+            {
+                Console.WriteLine($"Database save error: {dbEx.Message}");
+                Console.WriteLine($"Database save inner exception: {dbEx.InnerException?.Message}");
+                throw;
+            }
+
             return Results.Created($"/admin/media/{m.Id}", m);
         }
 
