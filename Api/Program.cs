@@ -284,6 +284,28 @@ app.MapGet("/debug/db-test", async (AppDb db) =>
     }
 });
 
+// S3 configuration check endpoint
+app.MapGet("/debug/s3-config", () =>
+{
+    var s3Bucket = Environment.GetEnvironmentVariable("AWS_S3_BUCKET");
+    var cloudFrontDomain = Environment.GetEnvironmentVariable("CLOUDFRONT_DOMAIN");
+    var awsRegion = Environment.GetEnvironmentVariable("AWS_REGION");
+
+    return Results.Ok(new
+    {
+        hasS3Bucket = !string.IsNullOrEmpty(s3Bucket),
+        s3Bucket = s3Bucket,
+        hasCloudFront = !string.IsNullOrEmpty(cloudFrontDomain),
+        cloudFrontDomain = cloudFrontDomain,
+        awsRegion = awsRegion ?? "us-east-1",
+        exampleUrl = !string.IsNullOrEmpty(cloudFrontDomain)
+            ? $"https://{cloudFrontDomain}/media/example.jpg"
+            : !string.IsNullOrEmpty(s3Bucket)
+                ? $"https://{s3Bucket}.s3.{awsRegion ?? "us-east-1"}.amazonaws.com/media/example.jpg"
+                : "S3 not configured"
+    });
+});
+
 // User check endpoint that works in production
 app.MapGet("/debug/users", async (AppDb db) =>
 {
@@ -1022,11 +1044,21 @@ admin.MapPost("/media/upload", async (HttpRequest req, IWebHostEnvironment env, 
                 await db.SaveChangesAsync();
                 Console.WriteLine($"[S3] Media saved to database with ID: {m.Id}");
             }
+            catch (DbUpdateException dbEx)
+            {
+                Console.WriteLine($"Database update error: {dbEx.Message}");
+                Console.WriteLine($"Database inner exception: {dbEx.InnerException?.Message}");
+                if (dbEx.InnerException?.InnerException != null)
+                {
+                    Console.WriteLine($"Database inner inner exception: {dbEx.InnerException.InnerException.Message}");
+                }
+                return Results.Problem($"Database error: {dbEx.InnerException?.Message ?? dbEx.Message}");
+            }
             catch (Exception dbEx)
             {
                 Console.WriteLine($"Database save error: {dbEx.Message}");
                 Console.WriteLine($"Database save inner exception: {dbEx.InnerException?.Message}");
-                throw;
+                return Results.Problem($"Database error: {dbEx.InnerException?.Message ?? dbEx.Message}");
             }
 
             return Results.Created($"/admin/media/{m.Id}", m);
@@ -1180,11 +1212,21 @@ admin.MapPost("/media/upload/{*folderPath}", async (string folderPath, HttpReque
                 await db.SaveChangesAsync();
                 Console.WriteLine($"[S3] Media saved to database with ID: {m.Id}");
             }
+            catch (DbUpdateException dbEx)
+            {
+                Console.WriteLine($"Database update error: {dbEx.Message}");
+                Console.WriteLine($"Database inner exception: {dbEx.InnerException?.Message}");
+                if (dbEx.InnerException?.InnerException != null)
+                {
+                    Console.WriteLine($"Database inner inner exception: {dbEx.InnerException.InnerException.Message}");
+                }
+                return Results.Problem($"Database error: {dbEx.InnerException?.Message ?? dbEx.Message}");
+            }
             catch (Exception dbEx)
             {
                 Console.WriteLine($"Database save error: {dbEx.Message}");
                 Console.WriteLine($"Database save inner exception: {dbEx.InnerException?.Message}");
-                throw;
+                return Results.Problem($"Database error: {dbEx.InnerException?.Message ?? dbEx.Message}");
             }
 
             return Results.Created($"/admin/media/{m.Id}", m);

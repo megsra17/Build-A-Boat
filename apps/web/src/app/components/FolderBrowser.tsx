@@ -402,7 +402,7 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
                   key={m.Id}
                   type="button"
                   onClick={() => onSelect(m)}
-                  className="aspect-square rounded-lg border border-white/10 hover:border-amber-400 overflow-hidden"
+                  className="aspect-square rounded-lg border border-white/10 hover:border-amber-400 overflow-hidden relative group"
                   title={m.label ?? ''}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -410,7 +410,12 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
                     src={m.Url} 
                     alt={m.label ?? ''} 
                     className="w-full h-full object-cover" 
+                    onError={(e) => {
+                      console.error('Failed to load image:', m.Url);
+                      (e.target as HTMLImageElement).src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23333" width="100" height="100"/%3E%3Ctext x="50" y="50" font-size="12" fill="%23999" text-anchor="middle" dominant-baseline="middle"%3EFailed to load%3C/text%3E%3C/svg%3E';
+                    }}
                   />
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
                 </button>
               ))}
 
