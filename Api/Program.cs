@@ -994,9 +994,11 @@ admin.MapPost("/media", async (MediaCreateDto dto, AppDb db) =>
     return Results.Created($"/admin/media/{m.Id}", m);
 });
 
-//upload media
+//upload media - redirect to media folder
 admin.MapPost("/media/upload", async (HttpRequest req, IWebHostEnvironment env, AppDb db, IS3Service s3Service) =>
 {
+    Console.WriteLine("[UPLOAD] Using /media/upload endpoint (no folder specified)");
+
     if (!req.HasFormContentType)
         return Results.BadRequest(new { message = "Invalid form data" });
 
@@ -1019,7 +1021,7 @@ admin.MapPost("/media/upload", async (HttpRequest req, IWebHostEnvironment env, 
         var s3BucketName = Environment.GetEnvironmentVariable("AWS_S3_BUCKET");
         if (!string.IsNullOrEmpty(s3BucketName))
         {
-            Console.WriteLine($"[S3] Uploading file: {file.FileName}");
+            Console.WriteLine($"[S3] Uploading file: {file.FileName} to default 'media' folder");
             var s3Url = await s3Service.UploadFileAsync(file, "media");
             Console.WriteLine($"[S3] File uploaded successfully: {s3Url}");
 
@@ -1040,24 +1042,34 @@ admin.MapPost("/media/upload", async (HttpRequest req, IWebHostEnvironment env, 
 
             try
             {
+                Console.WriteLine($"[S3] Adding media to context: Id={m.Id}, Url={m.Url}, FileName={m.FileName}");
                 db.Media.Add(m);
                 await db.SaveChangesAsync();
                 Console.WriteLine($"[S3] Media saved to database with ID: {m.Id}");
             }
             catch (DbUpdateException dbEx)
             {
-                Console.WriteLine($"Database update error: {dbEx.Message}");
-                Console.WriteLine($"Database inner exception: {dbEx.InnerException?.Message}");
+                Console.WriteLine($"[ERROR] Database update error: {dbEx.Message}");
+                Console.WriteLine($"[ERROR] Entries: {string.Join(", ", dbEx.Entries.Select(e => $"{e.Entity.GetType().Name}:{e.State}"))}");
+                if (dbEx.InnerException != null)
+                {
+                    Console.WriteLine($"[ERROR] Inner exception: {dbEx.InnerException.Message}");
+                    Console.WriteLine($"[ERROR] Inner stacktrace: {dbEx.InnerException.StackTrace}");
+                }
                 if (dbEx.InnerException?.InnerException != null)
                 {
-                    Console.WriteLine($"Database inner inner exception: {dbEx.InnerException.InnerException.Message}");
+                    Console.WriteLine($"[ERROR] Inner inner exception: {dbEx.InnerException.InnerException.Message}");
                 }
                 return Results.Problem($"Database error: {dbEx.InnerException?.Message ?? dbEx.Message}");
             }
             catch (Exception dbEx)
             {
-                Console.WriteLine($"Database save error: {dbEx.Message}");
-                Console.WriteLine($"Database save inner exception: {dbEx.InnerException?.Message}");
+                Console.WriteLine($"[ERROR] Database save error: {dbEx.GetType().Name}: {dbEx.Message}");
+                Console.WriteLine($"[ERROR] Stacktrace: {dbEx.StackTrace}");
+                if (dbEx.InnerException != null)
+                {
+                    Console.WriteLine($"[ERROR] Inner exception: {dbEx.InnerException.Message}");
+                }
                 return Results.Problem($"Database error: {dbEx.InnerException?.Message ?? dbEx.Message}");
             }
 
@@ -1067,7 +1079,7 @@ admin.MapPost("/media/upload", async (HttpRequest req, IWebHostEnvironment env, 
         // Option 2: Local file storage (Development only)
         if (env.IsDevelopment())
         {
-            var uploadsDir = Path.Combine(env.WebRootPath ?? env.ContentRootPath, "uploads");
+            var uploadsDir = Path.Combine(env.WebRootPath ?? env.ContentRootPath, "uploads", "media");
             Directory.CreateDirectory(uploadsDir);
 
             var fileName = $"{Guid.NewGuid()}_{file.FileName}";
@@ -1076,7 +1088,7 @@ admin.MapPost("/media/upload", async (HttpRequest req, IWebHostEnvironment env, 
             using var stream = File.Create(filePath);
             await file.CopyToAsync(stream);
 
-            var fileUrl = $"/uploads/{fileName}";
+            var fileUrl = $"/uploads/media/{fileName}";
 
             var m = new Media
             {
@@ -1100,9 +1112,7 @@ admin.MapPost("/media/upload", async (HttpRequest req, IWebHostEnvironment env, 
         Console.WriteLine($"Stack trace: {ex.StackTrace}");
         return Results.Problem($"Upload failed: {ex.Message}");
     }
-});
-
-//delete media
+});//delete media
 admin.MapDelete("/media/{id:guid}", async (Guid id, AppDb db, IS3Service s3Service) =>
 {
     var media = await db.Media.FindAsync(id);
@@ -1208,24 +1218,34 @@ admin.MapPost("/media/upload/{*folderPath}", async (string folderPath, HttpReque
 
             try
             {
+                Console.WriteLine($"[S3] Adding media to context: Id={m.Id}, Url={m.Url}, FileName={m.FileName}, FolderPath={folderPath}");
                 db.Media.Add(m);
                 await db.SaveChangesAsync();
                 Console.WriteLine($"[S3] Media saved to database with ID: {m.Id}");
             }
             catch (DbUpdateException dbEx)
             {
-                Console.WriteLine($"Database update error: {dbEx.Message}");
-                Console.WriteLine($"Database inner exception: {dbEx.InnerException?.Message}");
+                Console.WriteLine($"[ERROR] Database update error: {dbEx.Message}");
+                Console.WriteLine($"[ERROR] Entries: {string.Join(", ", dbEx.Entries.Select(e => $"{e.Entity.GetType().Name}:{e.State}"))}");
+                if (dbEx.InnerException != null)
+                {
+                    Console.WriteLine($"[ERROR] Inner exception: {dbEx.InnerException.Message}");
+                    Console.WriteLine($"[ERROR] Inner stacktrace: {dbEx.InnerException.StackTrace}");
+                }
                 if (dbEx.InnerException?.InnerException != null)
                 {
-                    Console.WriteLine($"Database inner inner exception: {dbEx.InnerException.InnerException.Message}");
+                    Console.WriteLine($"[ERROR] Inner inner exception: {dbEx.InnerException.InnerException.Message}");
                 }
                 return Results.Problem($"Database error: {dbEx.InnerException?.Message ?? dbEx.Message}");
             }
             catch (Exception dbEx)
             {
-                Console.WriteLine($"Database save error: {dbEx.Message}");
-                Console.WriteLine($"Database save inner exception: {dbEx.InnerException?.Message}");
+                Console.WriteLine($"[ERROR] Database save error: {dbEx.GetType().Name}: {dbEx.Message}");
+                Console.WriteLine($"[ERROR] Stacktrace: {dbEx.StackTrace}");
+                if (dbEx.InnerException != null)
+                {
+                    Console.WriteLine($"[ERROR] Inner exception: {dbEx.InnerException.Message}");
+                }
                 return Results.Problem($"Database error: {dbEx.InnerException?.Message ?? dbEx.Message}");
             }
 
