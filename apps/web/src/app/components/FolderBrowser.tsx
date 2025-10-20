@@ -202,12 +202,6 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
     setDragActive(true);
   };
 
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-  };
-
   const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -424,14 +418,26 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
 
         {/* Content Area */}
         <div 
-          className="flex-1 overflow-auto"
+          className="flex-1 overflow-auto relative"
           onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
+          onDragEnter={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setDragActive(true);
+          }}
+          onDragLeave={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            // Only set to false if we're leaving the content area entirely
+            if (e.currentTarget === e.target) {
+              setDragActive(false);
+            }
+          }}
           onDrop={handleDrop}
         >
           {dragActive && (
-            <div className="absolute inset-0 z-40 bg-amber-400/20 border-2 border-dashed border-amber-400 rounded-lg flex items-center justify-center pointer-events-none">
-              <div className="text-center">
+            <div className="absolute inset-0 z-40 bg-amber-400/20 border-2 border-dashed border-amber-400 rounded-lg flex items-center justify-center">
+              <div className="text-center pointer-events-none">
                 <p className="text-lg font-semibold text-amber-300">Drop images here to upload</p>
               </div>
             </div>
