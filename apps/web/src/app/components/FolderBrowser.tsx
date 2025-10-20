@@ -34,7 +34,7 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
     setLoading(true);
     setError(null);
     try {
-      // Load folders
+      // Always load folders
       const folderRes = await fetch(`${apiUrl}/admin/media/folders?prefix=${currentPath}`, {
         headers: jwt ? { Authorization: `Bearer ${jwt}` } : {},
       });
@@ -47,48 +47,18 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
         setFolders(cleanFolders);
       }
 
-      // Load files in current folder
-      if (currentPath) {
-        const fileRes = await fetch(`${apiUrl}/admin/media/folder/${currentPath}`, {
-          headers: jwt ? { Authorization: `Bearer ${jwt}` } : {},
-        });
-        
-        if (fileRes.ok) {
-          const fileData = await fileRes.json();
-          console.log('Files in folder:', fileData);
-          
-          // Convert to Media format
-          const mediaItems: Media[] = (fileData.files || []).map((file: { Key: string; Url: string }) => ({
-            id: file.Key,
-            url: file.Url,
-            label: file.Key.split('/').pop()
-          }));
-          setMedia(mediaItems);
-        } else {
-          console.error('Failed to load folder files:', fileRes.status);
-          setMedia([]);
-        }
+      // Load media for current path (whether root or subfolder)
+      const mediaRes = await fetch(`${apiUrl}/admin/media`, {
+        headers: jwt ? { Authorization: `Bearer ${jwt}` } : {},
+      });
+      
+      if (mediaRes.ok) {
+        const mediaData = await mediaRes.json();
+        const mediaArray = Array.isArray(mediaData) ? mediaData : (mediaData.items || []);
+        setMedia(mediaArray);
       } else {
-        // Root level - load all media for backward compatibility
-        const mediaRes = await fetch(`${apiUrl}/admin/media`, {
-          headers: jwt ? { Authorization: `Bearer ${jwt}` } : {},
-        });
-        
-        console.log('Media API response status:', mediaRes.status);
-        if (mediaRes.ok) {
-          const mediaData = await mediaRes.json();
-          console.log('Raw media API data:', mediaData);
-          const mediaArray = Array.isArray(mediaData) ? mediaData : (mediaData.items || []);
-          console.log('Root media loaded:', mediaArray.length, 'items');
-          console.log('Media array:', mediaArray);
-          console.log('First media item structure:', mediaArray[0]);
-          console.log('First media item keys:', mediaArray[0] ? Object.keys(mediaArray[0]) : 'no first item');
-          setMedia(mediaArray);
-        } else {
-          const errorText = await mediaRes.text();
-          console.error('Failed to load root media:', mediaRes.status, errorText);
-          setMedia([]);
-        }
+        console.error('Failed to load media:', mediaRes.status);
+        setMedia([]);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load directory');
@@ -422,7 +392,7 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
                   <img 
                     src={m.url} 
                     alt={m.label ?? ''} 
-                    className="w-full h-full object-cover" 
+                    className="w-full h-full object-contain bg-black/20" 
                     onLoad={() => console.log('Image loaded successfully:', m.url)}
                     onError={(e) => {
                       console.error('Failed to load image:', m.url);
