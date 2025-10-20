@@ -107,11 +107,11 @@ public class AppDb : DbContext
 
         // Media entity configuration
         b.Entity<Media>().Property(x => x.Id).HasColumnName("id");
-        b.Entity<Media>().Property(x => x.Url).HasColumnName("url");
-        b.Entity<Media>().Property(x => x.Label).HasColumnName("label");
-        b.Entity<Media>().Property(x => x.FileName).HasColumnName("file_name");
-        b.Entity<Media>().Property(x => x.ContentType).HasColumnName("content_type");
-        b.Entity<Media>().Property(x => x.UploadedAt).HasColumnName("uploaded_at");
+        b.Entity<Media>().Property(x => x.Url).HasColumnName("url").HasColumnType("text");
+        b.Entity<Media>().Property(x => x.Label).HasColumnName("label").HasColumnType("varchar(255)");
+        b.Entity<Media>().Property(x => x.FileName).HasColumnName("file_name").HasColumnType("varchar(255)");
+        b.Entity<Media>().Property(x => x.ContentType).HasColumnName("content_type").HasColumnType("varchar(255)");
+        b.Entity<Media>().Property(x => x.UploadedAt).HasColumnName("uploaded_at").HasColumnType("timestamp");
         b.Entity<Media>().Property(x => x.W).HasColumnName("w");
         b.Entity<Media>().Property(x => x.H).HasColumnName("h");
 
