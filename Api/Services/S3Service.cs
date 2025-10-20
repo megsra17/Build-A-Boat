@@ -42,7 +42,8 @@ public class S3Service : IS3Service
         var cloudFrontDomain = Environment.GetEnvironmentVariable("CLOUDFRONT_DOMAIN");
         if (!string.IsNullOrEmpty(cloudFrontDomain))
         {
-            return $"https://{cloudFrontDomain}/{key}";
+            // CloudFront origin is the S3 bucket, so we include the bucket name in the path
+            return $"https://{cloudFrontDomain}/{_bucketName}/{key}";
         }
 
         // Fallback to direct S3 URL
@@ -104,7 +105,7 @@ public class S3Service : IS3Service
             return response.S3Objects.Select(obj =>
             {
                 var url = !string.IsNullOrEmpty(cloudFrontDomain)
-                    ? $"https://{cloudFrontDomain}/{obj.Key}"
+                    ? $"https://{cloudFrontDomain}/{_bucketName}/{obj.Key}"
                     : $"https://{_bucketName}.s3.{region}.amazonaws.com/{obj.Key}";
                 return (obj.Key, url);
             }).ToList();
