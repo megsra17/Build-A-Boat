@@ -11,9 +11,12 @@ const API = process.env.NODE_ENV === 'production'
   : "http://localhost:5001";
 
 type Media = {
-  Id: string;
-  Url: string;
+  id: string;
+  url: string;
   label?: string | null;
+  fileName?: string;
+  contentType?: string;
+  uploadedAt?: string;
   w?: number | null;
   h?: number | null;
 };
@@ -27,7 +30,6 @@ export default function NewBoatPage() {
   const [msrp, setMsrp] = useState<number | undefined>(undefined);
   const [categories, setCategories] = useState<{id: string, slug: string, name: string}[]>([]);
   const [selectedCategory, setSelectedCategory] = useState("");
-  const [featDraft, setFeatDraft] = useState("");
   const [nextSlugNumber, setNextSlugNumber] = useState<number>(0);
 
   //images (store media Ids or Urls)
@@ -260,11 +262,11 @@ export default function NewBoatPage() {
         Name: name,
         BasePrice: typeof msrp === "number" ? msrp : Number(msrp || 0),
         ModelYear: typeof modelYear === "number" ? modelYear : Number(modelYear || 0),
-        PrimaryImageUrl: primary?.Url ?? null,
-        SecondaryImageUrl: secondary?.Url ?? null,
-        SideImageUrl: side?.Url ?? null,
-        LogoImageUrl: logo?.Url ?? null,
-        LayerMediaIds: layers.map(l => l.Id),
+        PrimaryImageUrl: primary?.url ?? null,
+        SecondaryImageUrl: secondary?.url ?? null,
+        SideImageUrl: side?.url ?? null,
+        LogoImageUrl: logo?.url ?? null,
+        LayerMediaIds: layers.map(l => l.id),
       }
 
       const res = await fetch(`${API}/admin/boat`, {
@@ -281,7 +283,7 @@ export default function NewBoatPage() {
         console.error("Create boat error response:", text);
         throw new Error(`Failed to create boat: ${res.status} ${text}`);
       }
-      const result = await res.json();
+      await res.json();
 
       //created go back to list
       r.push("/admin/boat");
@@ -395,7 +397,7 @@ export default function NewBoatPage() {
                   // preview
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
-                    src={it.val.Url}
+                    src={it.val.url}
                     alt={it.val.label ?? it.label}
                     className="w-full h-full object-cover"
                   />
@@ -444,9 +446,9 @@ export default function NewBoatPage() {
         {!!layers.length && (
           <div className="mt-4 grid grid-cols-2 md:grid-cols-6 gap-3">
             {layers.map((m, i) => (
-              <div key={`${m.Id}-${i}`} className="relative rounded-lg overflow-hidden border border-white/10">
+              <div key={`${m.id}-${i}`} className="relative rounded-lg overflow-hidden border border-white/10">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={m.Url} alt={m.label ?? ""} className="w-full h-24 object-cover" />
+                <img src={m.url} alt={m.label ?? ""} className="w-full h-24 object-cover" />
                 <button
                   type="button"
                   onClick={() => removeLayer(i)}
@@ -534,14 +536,14 @@ export default function NewBoatPage() {
               )}
               {media.map((m) => (
                 <button
-                  key={m.Id}
+                  key={m.id}
                   type="button"
                   onClick={() => pick(m)}
                   className="rounded-lg overflow-hidden border border-white/10 hover:border-amber-400"
                   title={m.label ?? ""}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={m.Url} alt={m.label ?? ""} className="w-full h-28 object-cover" />
+                  <img src={m.url} alt={m.label ?? ""} className="w-full h-28 object-cover" />
                 </button>
               ))}
             </div>
