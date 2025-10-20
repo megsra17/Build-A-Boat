@@ -111,7 +111,7 @@ public class AppDb : DbContext
         b.Entity<Media>().Property(x => x.Label).HasColumnName("label").HasColumnType("varchar(255)");
         b.Entity<Media>().Property(x => x.FileName).HasColumnName("file_name").HasColumnType("varchar(255)");
         b.Entity<Media>().Property(x => x.ContentType).HasColumnName("content_type").HasColumnType("varchar(255)");
-        b.Entity<Media>().Property(x => x.UploadedAt).HasColumnName("uploaded_at").HasColumnType("timestamp");
+        b.Entity<Media>().Property(x => x.UploadedAt).HasColumnName("uploaded_at").HasColumnType("timestamp with time zone");
         b.Entity<Media>().Property(x => x.W).HasColumnName("w");
         b.Entity<Media>().Property(x => x.H).HasColumnName("h");
 
