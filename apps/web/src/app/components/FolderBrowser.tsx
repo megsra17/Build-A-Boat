@@ -69,13 +69,17 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
           headers: jwt ? { Authorization: `Bearer ${jwt}` } : {},
         });
         
+        console.log('Media API response status:', mediaRes.status);
         if (mediaRes.ok) {
           const mediaData = await mediaRes.json();
+          console.log('Raw media API data:', mediaData);
           const mediaArray = Array.isArray(mediaData) ? mediaData : (mediaData.items || []);
           console.log('Root media loaded:', mediaArray.length, 'items');
+          console.log('Media array:', mediaArray);
           setMedia(mediaArray);
         } else {
-          console.error('Failed to load root media:', mediaRes.status);
+          const errorText = await mediaRes.text();
+          console.error('Failed to load root media:', mediaRes.status, errorText);
           setMedia([]);
         }
       }
