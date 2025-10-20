@@ -2,9 +2,14 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Plus, Folder, ArrowLeft, Upload } from 'lucide-react';
 
 interface Media {
-  Id: string;
-  Url: string;
+  id: string;
+  url: string;
   label?: string | null;
+  fileName?: string;
+  contentType?: string;
+  uploadedAt?: string;
+  w?: number | null;
+  h?: number | null;
 }
 
 interface FolderBrowserProps {
@@ -54,8 +59,8 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
           
           // Convert to Media format
           const mediaItems: Media[] = (fileData.files || []).map((file: { Key: string; Url: string }) => ({
-            Id: file.Key,
-            Url: file.Url,
+            id: file.Key,
+            url: file.Url,
             label: file.Key.split('/').pop()
           }));
           setMedia(mediaItems);
@@ -404,10 +409,10 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
 
               {/* Images */}
               {media.map((m) => {
-                console.log('Rendering media item:', { id: m.Id, url: m.Url, label: m.label });
+                console.log('Rendering media item:', { id: m.id, url: m.url, label: m.label });
                 return (
                 <button
-                  key={m.Id}
+                  key={m.id}
                   type="button"
                   onClick={() => onSelect(m)}
                   className="aspect-square rounded-lg border border-white/10 hover:border-amber-400 overflow-hidden relative group"
@@ -415,12 +420,12 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img 
-                    src={m.Url} 
+                    src={m.url} 
                     alt={m.label ?? ''} 
                     className="w-full h-full object-cover" 
-                    onLoad={() => console.log('Image loaded successfully:', m.Url)}
+                    onLoad={() => console.log('Image loaded successfully:', m.url)}
                     onError={(e) => {
-                      console.error('Failed to load image:', m.Url);
+                      console.error('Failed to load image:', m.url);
                       (e.target as HTMLImageElement).src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23333" width="100" height="100"/%3E%3Ctext x="50" y="50" font-size="12" fill="%23999" text-anchor="middle" dominant-baseline="middle"%3EFailed to load%3C/text%3E%3C/svg%3E';
                     }}
                   />
