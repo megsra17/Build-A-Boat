@@ -441,7 +441,7 @@ export default function NewBoatPage() {
                   <img
                     src={it.val.url}
                     alt={it.val.label ?? it.label}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-contain bg-black/10"
                   />
                 ) : (
                   <div className="text-center text-white/40">
