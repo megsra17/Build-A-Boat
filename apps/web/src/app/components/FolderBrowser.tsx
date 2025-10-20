@@ -29,6 +29,7 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
   const [error, setError] = useState<string | null>(null);
   const [newFolderName, setNewFolderName] = useState('');
   const [showNewFolder, setShowNewFolder] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
 
   const loadCurrentDirectory = useCallback(async () => {
     setLoading(true);
@@ -195,6 +196,85 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
     }
   };
 
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+
+    const files = Array.from(e.dataTransfer.files);
+    const imageFile = files.find(file => file.type.startsWith('image/'));
+
+    if (!imageFile) {
+      setError('Please drop an image file (JPEG, PNG, GIF, WebP)');
+      return;
+    }
+
+    // Upload the dragged file
+    setUploading(true);
+    setError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', imageFile);
+      
+      let uploadPath;
+      
+      if (currentPath && typeof currentPath === 'string' && currentPath.trim()) {
+        const encodedPath = currentPath.split('/').map(part => encodeURIComponent(part)).join('/');
+        uploadPath = `${apiUrl}/admin/media/upload/${encodedPath}`;
+      } else {
+        uploadPath = `${apiUrl}/admin/media/upload`;
+      }
+      
+      let res = await fetch(uploadPath, {
+        method: 'POST',
+        headers: jwt ? { Authorization: `Bearer ${jwt}` } : {},
+        body: formData,
+      });
+
+      // If folder upload fails with 500, try regular upload
+      if (!res.ok && currentPath) {
+        const retryFormData = new FormData();
+        retryFormData.append('file', imageFile);
+        
+        res = await fetch(`${apiUrl}/admin/media/upload`, {
+          method: 'POST',
+          headers: jwt ? { Authorization: `Bearer ${jwt}` } : {},
+          body: retryFormData,
+        });
+      }
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`Upload failed: ${res.status} ${errorText}`);
+      }
+
+      const uploadedMedia = await res.json();
+      
+      // Add to media list and auto-select
+      setMedia(prev => [uploadedMedia, ...prev]);
+      onSelect(uploadedMedia);
+      
+    } catch (err) {
+      console.error('Upload error:', err);
+      setError(err instanceof Error ? err.message : 'Upload failed');
+    } finally {
+      setUploading(false);
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -343,7 +423,19 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
         )}
 
         {/* Content Area */}
-        <div className="flex-1 overflow-auto">
+        <div 
+          className="flex-1 overflow-auto"
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
+          {dragActive && (
+            <div className="absolute inset-0 z-40 bg-amber-400/20 border-2 border-dashed border-amber-400 rounded-lg flex items-center justify-center pointer-events-none">
+              <div className="text-center">
+                <p className="text-lg font-semibold text-amber-300">Drop images here to upload</p>
+              </div>
+            </div>
+          )}
           {loading ? (
             <div className="flex items-center justify-center h-40">
               <div className="animate-spin size-8 border-2 border-amber-500 border-t-transparent rounded-full"></div>
