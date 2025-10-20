@@ -34,7 +34,7 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
     setLoading(true);
     setError(null);
     try {
-      // Always load folders
+      // Always load folders for current path
       const folderRes = await fetch(`${apiUrl}/admin/media/folders?prefix=${currentPath}`, {
         headers: jwt ? { Authorization: `Bearer ${jwt}` } : {},
       });
@@ -42,22 +42,33 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
       if (folderRes.ok) {
         const folderData = await folderRes.json();
         console.log('Folder API response:', folderData);
-        // Clean up folder paths - remove trailing slashes for consistency
         const cleanFolders = (folderData.folders || []).map((folder: string) => folder.replace(/\/+$/, ''));
         setFolders(cleanFolders);
+      } else {
+        setFolders([]);
       }
 
-      // Load media for current path (whether root or subfolder)
-      const mediaRes = await fetch(`${apiUrl}/admin/media`, {
-        headers: jwt ? { Authorization: `Bearer ${jwt}` } : {},
-      });
-      
-      if (mediaRes.ok) {
-        const mediaData = await mediaRes.json();
-        const mediaArray = Array.isArray(mediaData) ? mediaData : (mediaData.items || []);
-        setMedia(mediaArray);
+      // Only load media if we're in a subfolder (not at root)
+      if (currentPath) {
+        const fileRes = await fetch(`${apiUrl}/admin/media/folder/${currentPath}`, {
+          headers: jwt ? { Authorization: `Bearer ${jwt}` } : {},
+        });
+        
+        if (fileRes.ok) {
+          const fileData = await fileRes.json();
+          console.log('Files in folder:', fileData);
+          
+          const mediaItems: Media[] = (fileData.files || []).map((file: { Key: string; Url: string }) => ({
+            id: file.Key,
+            url: file.Url,
+            label: file.Key.split('/').pop()
+          }));
+          setMedia(mediaItems);
+        } else {
+          setMedia([]);
+        }
       } else {
-        console.error('Failed to load media:', mediaRes.status);
+        // At root level - show no media, only folders
         setMedia([]);
       }
     } catch (err) {
@@ -343,24 +354,27 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
               {/* Folders */}
               {folders
                 .filter(folder => {
-                  // Don't show the current folder we're already in
-                  if (!currentPath || typeof currentPath !== 'string') return true; // At root, show all folders
-                  if (!folder || typeof folder !== 'string') return false; // Skip invalid folders
+                  if (!folder || typeof folder !== 'string') return false;
                   
-                  // Clean both paths for comparison
+                  // At root: show all top-level folders
+                  if (!currentPath) {
+                    return !folder.includes('/');
+                  }
+                  
+                  // In a subfolder: show direct children only
                   const cleanCurrentPath = currentPath.replace(/\/+$/, '');
                   const cleanFolder = folder.replace(/\/+$/, '');
+                  const folderDepth = cleanFolder.split('/').length;
+                  const currentDepth = cleanCurrentPath.split('/').length;
                   
-                  return cleanFolder !== cleanCurrentPath && !cleanFolder.startsWith(cleanCurrentPath + '/');
+                  return cleanFolder.startsWith(cleanCurrentPath + '/') && folderDepth === currentDepth + 1;
                 })
                 .map((folder) => {
                   if (!folder || typeof folder !== 'string') return null;
                   
-                  // Clean the folder path and get just the name
                   const cleanFolder = folder.replace(/\/+$/, '');
                   const folderName = cleanFolder.split('/').pop() || cleanFolder || 'Unknown';
                   
-                  console.log('Rendering folder:', cleanFolder, 'Display name:', folderName);
                   return (
                     <button
                       key={cleanFolder}
