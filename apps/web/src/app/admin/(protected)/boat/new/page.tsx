@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import {useRouter} from "next/navigation";
-import {Plus, Check, Folder} from "lucide-react";
+import {Plus, Check, Folder, Trash2} from "lucide-react";
 import FolderBrowser from "../../../../components/FolderBrowser";
 
 // Use Railway URL for production, localhost for development
@@ -52,6 +52,7 @@ export default function NewBoatPage() {
   const [dragTarget, setDragTarget] = useState<string | null>(null);
   const [useFolderBrowser, setUseFolderBrowser] = useState(false);
   const [jwt, setJwt] = useState<string | null>(null);
+  const [folders, setFolders] = useState<string[]>([]);
 
   // Fetch next available slug number
   useEffect(() => {
@@ -103,6 +104,26 @@ export default function NewBoatPage() {
     })();
   }, []);
 
+  // Fetch folders for media picker
+  useEffect(() =>{
+    (async () => {
+      try{
+        const jwt = typeof window !== "undefined" ? localStorage.getItem("jwt") || sessionStorage.getItem("jwt") : null;
+
+        const res = await fetch(`${API}/admin/media/folders`, {
+          headers: jwt ?{Authorization: `Bearer ${jwt}`} : {},
+        });
+        if(res.ok) {
+          const data = await res.json();
+          const folderArray = (data.folders || []).map((f: string) => f.replace(/\/+$/, ''));
+          setFolders(folderArray);
+        }
+      } catch (error) {
+        console.error("Failed to load folders:", error);
+      }
+    })();
+  }, []);
+
   useEffect(() => {
   (async () => {
     try{
@@ -124,6 +145,27 @@ export default function NewBoatPage() {
 
   function removeLayer(i: number){
     setLayers(l => l.filter((_, idx) => idx !== i));
+  }
+
+  async function deleteMedia(mediaId: string) {
+    try {
+      const jwt = typeof window !== "undefined" ? localStorage.getItem("jwt") || sessionStorage.getItem("jwt") : null;
+      
+      const res = await fetch(`${API}/admin/media/${mediaId}`, {
+        method: "DELETE",
+        headers: jwt ? { Authorization: `Bearer ${jwt}` } : {},
+      });
+
+      if (!res.ok) {
+        throw new Error(`Failed to delete media: ${res.status}`);
+      }
+
+      // Remove from media list
+      setMedia(prev => prev.filter(m => m.id !== mediaId));
+    } catch (error) {
+      console.error("Delete error:", error);
+      setErr(error instanceof Error ? error.message : "Failed to delete media");
+    }
   }
 
   async function uploadMedia(file: File) {
@@ -520,32 +562,67 @@ export default function NewBoatPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-6 gap-4 max-h-[65vh] overflow-auto">
-              {media.length === 0 && !uploading && (
-                <div className="col-span-full text-center text-white/60">
-                  No media found. Upload an image above to get started.
+            {/* Folders Section */}
+            {folders.length > 0 && (
+              <div className="mb-6">
+                <h3 className="text-sm font-semibold text-white/70 mb-3">Folders</h3>
+                <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-6">
+                  {folders.map((folder) => (
+                    <button
+                      key={folder}
+                      type="button"
+                      onClick={() => setUseFolderBrowser(true)}
+                      className="aspect-square rounded-lg border border-white/10 hover:border-amber-400 bg-black/20 flex flex-col items-center justify-center p-4 text-center hover:bg-black/40 transition-colors"
+                    >
+                      <Folder className="size-6 text-amber-400 mb-2" />
+                      <span className="text-xs text-white/80 truncate w-full">
+                        {folder.split('/').pop()}
+                      </span>
+                    </button>
+                  ))}
                 </div>
-              )}
-              {uploading && (
-                <div className="col-span-full text-center text-white/60">
-                  <div className="inline-flex items-center gap-2">
-                    <div className="animate-spin size-4 border-2 border-amber-500 border-t-transparent rounded-full"></div>
-                    Uploading image...
+                <hr className="border-white/10 mb-6" />
+              </div>
+            )}
+
+            {/* Media Grid with Delete */}
+            <div>
+              <h3 className="text-sm font-semibold text-white/70 mb-3">All Media</h3>
+              <div className="grid grid-cols-2 md:grid-cols-6 gap-4 max-h-[65vh] overflow-auto">
+                {media.length === 0 && !uploading && (
+                  <div className="col-span-full text-center text-white/60">
+                    No media found. Upload an image above to get started.
                   </div>
-                </div>
-              )}
-              {media.map((m) => (
-                <button
-                  key={m.id}
-                  type="button"
-                  onClick={() => pick(m)}
-                  className="rounded-lg overflow-hidden border border-white/10 hover:border-amber-400"
-                  title={m.label ?? ""}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={m.url} alt={m.label ?? ""} className="w-full h-28 object-cover" />
-                </button>
-              ))}
+                )}
+                {uploading && (
+                  <div className="col-span-full text-center text-white/60">
+                    <div className="inline-flex items-center gap-2">
+                      <div className="animate-spin size-4 border-2 border-amber-500 border-t-transparent rounded-full"></div>
+                      Uploading image...
+                    </div>
+                  </div>
+                )}
+                {media.map((m) => (
+                  <div key={m.id} className="relative group rounded-lg overflow-hidden border border-white/10 hover:border-amber-400">
+                    <button
+                      type="button"
+                      onClick={() => pick(m)}
+                      className="w-full h-full"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={m.url} alt={m.label ?? ""} className="w-full h-28 object-cover" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => deleteMedia(m.id)}
+                      className="absolute top-1 right-1 size-6 rounded-full bg-red-600/80 hover:bg-red-600 border border-red-400 text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                      title="Delete image"
+                    >
+                      <Trash2 className="size-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
