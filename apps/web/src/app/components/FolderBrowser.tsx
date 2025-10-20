@@ -76,6 +76,8 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
           const mediaArray = Array.isArray(mediaData) ? mediaData : (mediaData.items || []);
           console.log('Root media loaded:', mediaArray.length, 'items');
           console.log('Media array:', mediaArray);
+          console.log('First media item structure:', mediaArray[0]);
+          console.log('First media item keys:', mediaArray[0] ? Object.keys(mediaArray[0]) : 'no first item');
           setMedia(mediaArray);
         } else {
           const errorText = await mediaRes.text();
