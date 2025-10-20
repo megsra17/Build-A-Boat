@@ -610,7 +610,7 @@ export default function NewBoatPage() {
                       className="w-full h-full"
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={m.url} alt={m.label ?? ""} className="w-full h-28 object-cover" />
+                      <img src={m.url} alt={m.label ?? ""} className="w-full h-28 object-contain bg-black/10" />
                     </button>
                     <button
                       type="button"
