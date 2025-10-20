@@ -397,7 +397,9 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
                 .filter(Boolean)}
 
               {/* Images */}
-              {media.map((m) => (
+              {media.map((m) => {
+                console.log('Rendering media item:', { id: m.Id, url: m.Url, label: m.label });
+                return (
                 <button
                   key={m.Id}
                   type="button"
@@ -410,6 +412,7 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
                     src={m.Url} 
                     alt={m.label ?? ''} 
                     className="w-full h-full object-cover" 
+                    onLoad={() => console.log('Image loaded successfully:', m.Url)}
                     onError={(e) => {
                       console.error('Failed to load image:', m.Url);
                       (e.target as HTMLImageElement).src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23333" width="100" height="100"/%3E%3Ctext x="50" y="50" font-size="12" fill="%23999" text-anchor="middle" dominant-baseline="middle"%3EFailed to load%3C/text%3E%3C/svg%3E';
@@ -417,7 +420,8 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
                   />
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
                 </button>
-              ))}
+              );
+              })}
 
               {/* Empty State */}
               {!loading && folders.length === 0 && media.length === 0 && (
