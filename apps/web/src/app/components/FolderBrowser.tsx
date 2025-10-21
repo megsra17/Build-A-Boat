@@ -75,17 +75,19 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
                   console.log('Filtered out invalid file:', file);
                   return false;
                 }
-                const fileObj = file as { Key?: string; Url?: string };
-                const hasValidProps = fileObj.Key && fileObj.Url;
+                const fileObj = file as { key?: string; url?: string; Key?: string; Url?: string };
+                // Check for both lowercase and uppercase versions
+                const hasValidProps = (fileObj.key && fileObj.url) || (fileObj.Key && fileObj.Url);
                 if (!hasValidProps) {
-                  console.log('Filtered out file missing Key/Url:', fileObj);
+                  console.log('Filtered out file missing key/url:', fileObj);
                 }
                 return hasValidProps;
               })
-              .map((file: { Key: string; Url: string }) => ({
-                id: file.Key,
-                url: file.Url,
-                label: file.Key && typeof file.Key === 'string' ? file.Key.split('/').pop() : 'Unnamed'
+              .map((file: { key?: string; url?: string; Key?: string; Url?: string }) => ({
+                id: file.key || file.Key || '',
+                url: file.url || file.Url || '',
+                label: (file.key || file.Key) && typeof (file.key || file.Key) === 'string' ? 
+                  (file.key || file.Key)!.split('/').pop() : 'Unnamed'
               }));
             console.log('Processed media items:', mediaItems);
             setMedia(mediaItems);
