@@ -1,12 +1,18 @@
 using Amazon.S3;
 using Amazon.S3.Model;
 
+public class S3FileInfo
+{
+    public string Key { get; set; } = string.Empty;
+    public string Url { get; set; } = string.Empty;
+}
+
 public interface IS3Service
 {
     Task<string> UploadFileAsync(IFormFile file, string? folder = null);
     Task<bool> DeleteFileAsync(string fileUrl);
     Task<List<string>> ListFoldersAsync(string? prefix = null);
-    Task<List<(string Key, string Url)>> ListFilesInFolderAsync(string folderPath);
+    Task<List<S3FileInfo>> ListFilesInFolderAsync(string folderPath);
 }
 
 public class S3Service : IS3Service
@@ -86,7 +92,7 @@ public class S3Service : IS3Service
         }
     }
 
-    public async Task<List<(string Key, string Url)>> ListFilesInFolderAsync(string folderPath)
+    public async Task<List<S3FileInfo>> ListFilesInFolderAsync(string folderPath)
     {
         try
         {
@@ -106,12 +112,12 @@ public class S3Service : IS3Service
                 var url = !string.IsNullOrEmpty(cloudFrontDomain)
                     ? $"https://{cloudFrontDomain}/{obj.Key}"
                     : $"https://{_bucketName}.s3.{region}.amazonaws.com/{obj.Key}";
-                return (obj.Key, url);
+                return new S3FileInfo { Key = obj.Key, Url = url };
             }).ToList();
         }
         catch
         {
-            return new List<(string, string)>();
+            return new List<S3FileInfo>();
         }
     }
 }
