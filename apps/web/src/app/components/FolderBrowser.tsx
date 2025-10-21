@@ -35,6 +35,8 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
     setLoading(true);
     setError(null);
     try {
+      console.log('Loading directory for path:', currentPath);
+      
       // Always load folders for current path
       const folderRes = await fetch(`${apiUrl}/admin/media/folders?prefix=${currentPath}`, {
         headers: jwt ? { Authorization: `Bearer ${jwt}` } : {},
@@ -43,7 +45,9 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
       if (folderRes.ok) {
         const folderData = await folderRes.json();
         console.log('Folder API response:', folderData);
-        const cleanFolders = (folderData.folders || []).map((folder: string) => folder.replace(/\/+$/, ''));
+        const cleanFolders = (folderData.folders || [])
+          .filter((folder: unknown) => folder && typeof folder === 'string')
+          .map((folder: string) => folder.replace(/\/+$/, ''));
         setFolders(cleanFolders);
       } else {
         setFolders([]);
@@ -58,14 +62,40 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
         if (fileRes.ok) {
           const fileData = await fileRes.json();
           console.log('Files in folder:', fileData);
+          console.log('Individual file objects:');
+          (fileData.files || []).forEach((file: unknown, index: number) => {
+            console.log(`File ${index}:`, file);
+          });
           
-          const mediaItems: Media[] = (fileData.files || []).map((file: { Key: string; Url: string }) => ({
-            id: file.Key || '',
-            url: file.Url || '',
-            label: file.Key ? file.Key.split('/').pop() : 'Unnamed'
-          }));
-          setMedia(mediaItems);
+          try {
+            const mediaItems: Media[] = (fileData.files || [])
+              .filter((file: unknown) => {
+                // Check if file has the expected structure
+                if (!file || typeof file !== 'object' || file === null) {
+                  console.log('Filtered out invalid file:', file);
+                  return false;
+                }
+                const fileObj = file as { Key?: string; Url?: string };
+                const hasValidProps = fileObj.Key && fileObj.Url;
+                if (!hasValidProps) {
+                  console.log('Filtered out file missing Key/Url:', fileObj);
+                }
+                return hasValidProps;
+              })
+              .map((file: { Key: string; Url: string }) => ({
+                id: file.Key,
+                url: file.Url,
+                label: file.Key && typeof file.Key === 'string' ? file.Key.split('/').pop() : 'Unnamed'
+              }));
+            console.log('Processed media items:', mediaItems);
+            setMedia(mediaItems);
+          } catch (mediaError) {
+            console.error('Error processing media items:', mediaError);
+            setMedia([]);
+            setError('Failed to process media files');
+          }
         } else {
+          console.log('File request failed:', fileRes.status, fileRes.statusText);
           setMedia([]);
         }
       } else {
@@ -92,6 +122,10 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
   };
 
   const navigateUp = () => {
+    if (!currentPath || typeof currentPath !== 'string') {
+      setCurrentPath('');
+      return;
+    }
     const parentPath = currentPath.split('/').slice(0, -1).join('/');
     setCurrentPath(parentPath);
   };
@@ -462,6 +496,10 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
                   // In a subfolder: show direct children only
                   const cleanCurrentPath = currentPath.replace(/\/+$/, '');
                   const cleanFolder = folder.replace(/\/+$/, '');
+                  
+                  // Add safety checks for split operations
+                  if (!cleanFolder || !cleanCurrentPath) return false;
+                  
                   const folderDepth = cleanFolder.split('/').length;
                   const currentDepth = cleanCurrentPath.split('/').length;
                   
