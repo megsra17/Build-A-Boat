@@ -1288,7 +1288,92 @@ admin.MapPost("/media/upload/{*folderPath}", async (string folderPath, HttpReque
         Console.WriteLine($"Stack trace: {ex.StackTrace}");
         return Results.Problem($"Upload failed: {ex.Message}");
     }
-});// Categories
+});
+
+// Delete media by URL
+admin.MapPost("/media/delete", async (HttpRequest req, AppDb db, IS3Service s3Service) =>
+{
+    var body = await req.ReadFromJsonAsync<JsonElement>();
+    var url = body.GetProperty("url").GetString();
+    
+    if (string.IsNullOrEmpty(url))
+        return Results.BadRequest(new { message = "URL is required" });
+
+    var media = await db.Media.FirstOrDefaultAsync(m => m.Url == url);
+    if (media is null) return Results.NotFound();
+
+    try
+    {
+        // Delete from S3 if it's an S3 URL
+        var s3BucketName = Environment.GetEnvironmentVariable("AWS_S3_BUCKET");
+        if (!string.IsNullOrEmpty(s3BucketName) && media.Url.Contains(s3BucketName))
+        {
+            Console.WriteLine($"[S3] Deleting file: {media.Url}");
+            var deleted = await s3Service.DeleteFileAsync(media.Url);
+            if (!deleted)
+            {
+                Console.WriteLine($"[S3] Warning: Failed to delete file from S3: {media.Url}");
+            }
+        }
+
+        // Remove from database
+        db.Media.Remove(media);
+        await db.SaveChangesAsync();
+
+        Console.WriteLine($"[DB] Deleted media record: {media.Id}");
+        return Results.NoContent();
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Delete media error: {ex.Message}");
+        return Results.Problem($"Delete failed: {ex.Message}");
+    }
+});
+
+// Delete folder and all its contents
+admin.MapPost("/media/folder/delete", async (HttpRequest req, AppDb db, IS3Service s3Service) =>
+{
+    var body = await req.ReadFromJsonAsync<JsonElement>();
+    var folderPath = body.GetProperty("folderPath").GetString();
+    
+    if (string.IsNullOrEmpty(folderPath))
+        return Results.BadRequest(new { message = "Folder path is required" });
+
+    try
+    {
+        // Get all files in the folder from S3
+        var files = await s3Service.ListFilesInFolderAsync(folderPath);
+        
+        // Delete each file from S3 and database
+        foreach (var file in files)
+        {
+            // Delete from S3
+            var deleted = await s3Service.DeleteFileAsync(file.Url);
+            if (!deleted)
+            {
+                Console.WriteLine($"[S3] Warning: Failed to delete file from S3: {file.Url}");
+            }
+
+            // Delete from database
+            var media = await db.Media.FirstOrDefaultAsync(m => m.Url == file.Url);
+            if (media != null)
+            {
+                db.Media.Remove(media);
+            }
+        }
+
+        await db.SaveChangesAsync();
+        Console.WriteLine($"[DB] Deleted folder and {files.Count} files: {folderPath}");
+        return Results.Ok(new { deletedFiles = files.Count });
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Delete folder error: {ex.Message}");
+        return Results.Problem($"Delete failed: {ex.Message}");
+    }
+});
+
+// Categories
 admin.MapGet("/category", async (AppDb db) =>
     Results.Ok(new { items = await db.Categories.OrderBy(c => c.Name).ToListAsync() }));
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, Folder, ArrowLeft, Upload } from 'lucide-react';
+import { Plus, Folder, ArrowLeft, Upload, Trash2 } from 'lucide-react';
 
 interface Media {
   id: string;
@@ -229,6 +229,64 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
       
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create folder');
+    }
+  };
+
+  const deleteMedia = async (mediaId: string, mediaUrl: string) => {
+    if (!confirm('Are you sure you want to delete this image?')) return;
+    
+    setError(null);
+    try {
+      const res = await fetch(`${apiUrl}/admin/media/delete`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(jwt ? { Authorization: `Bearer ${jwt}` } : {}),
+        },
+        body: JSON.stringify({ url: mediaUrl }),
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`Failed to delete image: ${res.status} ${errorText}`);
+      }
+
+      // Remove from media list and reload directory
+      setMedia(prev => prev.filter(m => m.id !== mediaId));
+      await loadCurrentDirectory();
+      
+    } catch (err) {
+      console.error('Delete error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to delete image');
+    }
+  };
+
+  const deleteFolder = async (folderPath: string) => {
+    const folderName = folderPath.split('/').pop() || folderPath;
+    if (!confirm(`Are you sure you want to delete the folder "${folderName}" and all its contents?`)) return;
+    
+    setError(null);
+    try {
+      const res = await fetch(`${apiUrl}/admin/media/folder/delete`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(jwt ? { Authorization: `Bearer ${jwt}` } : {}),
+        },
+        body: JSON.stringify({ folderPath }),
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`Failed to delete folder: ${res.status} ${errorText}`);
+      }
+
+      // Reload the current directory to refresh the view
+      await loadCurrentDirectory();
+      
+    } catch (err) {
+      console.error('Delete folder error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to delete folder');
     }
   };
 
@@ -514,17 +572,29 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
                   const folderName = cleanFolder.split('/').pop() || cleanFolder || 'Unknown';
                   
                   return (
-                    <button
-                      key={cleanFolder}
-                      type="button"
-                      onClick={() => navigateToFolder(cleanFolder)}
-                      className="aspect-square rounded-lg border border-white/10 hover:border-amber-400 bg-black/20 flex flex-col items-center justify-center p-4 text-center"
-                    >
-                      <Folder className="size-8 text-amber-400 mb-2" />
-                      <span className="text-sm text-white/80 truncate w-full">
-                        {folderName}
-                      </span>
-                    </button>
+                    <div key={cleanFolder} className="relative group">
+                      <button
+                        type="button"
+                        onClick={() => navigateToFolder(cleanFolder)}
+                        className="w-full aspect-square rounded-lg border border-white/10 hover:border-amber-400 bg-black/20 flex flex-col items-center justify-center p-4 text-center"
+                      >
+                        <Folder className="size-8 text-amber-400 mb-2" />
+                        <span className="text-sm text-white/80 truncate w-full">
+                          {folderName}
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteFolder(cleanFolder);
+                        }}
+                        className="absolute top-1 right-1 size-6 rounded-full bg-red-600/80 hover:bg-red-600 border border-red-400 text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                        title="Delete folder"
+                      >
+                        <Trash2 className="size-3" />
+                      </button>
+                    </div>
                   );
                 })
                 .filter(Boolean)}
@@ -534,29 +604,41 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
                 console.log('Rendering media item:', { id: m.id, url: m.url, label: m.label });
                 const fileName = m.fileName || m.label || (m.id && typeof m.id === 'string' ? m.id.split('/').pop() : null) || 'Unnamed';
                 return (
-                <button
-                  key={m.id}
-                  type="button"
-                  onClick={() => onSelect(m)}
-                  className="aspect-square rounded-lg border border-white/10 hover:border-amber-400 overflow-hidden relative group flex flex-col"
-                  title={fileName}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img 
-                    src={m.url} 
-                    alt={m.label ?? ''} 
-                    className="w-full flex-1 object-contain bg-black/20" 
-                    onLoad={() => console.log('Image loaded successfully:', m.url)}
-                    onError={(e) => {
-                      console.error('Failed to load image:', m.url);
-                      (e.target as HTMLImageElement).src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23333" width="100" height="100"/%3E%3Ctext x="50" y="50" font-size="12" fill="%23999" text-anchor="middle" dominant-baseline="middle"%3EFailed to load%3C/text%3E%3C/svg%3E';
+                <div key={m.id} className="relative group">
+                  <button
+                    type="button"
+                    onClick={() => onSelect(m)}
+                    className="w-full aspect-square rounded-lg border border-white/10 hover:border-amber-400 overflow-hidden relative flex flex-col"
+                    title={fileName}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img 
+                      src={m.url} 
+                      alt={m.label ?? ''} 
+                      className="w-full flex-1 object-contain bg-black/20" 
+                      onLoad={() => console.log('Image loaded successfully:', m.url)}
+                      onError={(e) => {
+                        console.error('Failed to load image:', m.url);
+                        (e.target as HTMLImageElement).src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23333" width="100" height="100"/%3E%3Ctext x="50" y="50" font-size="12" fill="%23999" text-anchor="middle" dominant-baseline="middle"%3EFailed to load%3C/text%3E%3C/svg%3E';
+                      }}
+                    />
+                    <div className="p-1 bg-black/80 text-xs text-white/90 truncate w-full">
+                      {fileName}
+                    </div>
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors pointer-events-none" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deleteMedia(m.id, m.url);
                     }}
-                  />
-                  <div className="p-1 bg-black/80 text-xs text-white/90 truncate w-full">
-                    {fileName}
-                  </div>
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors pointer-events-none" />
-                </button>
+                    className="absolute top-1 right-1 size-6 rounded-full bg-red-600/80 hover:bg-red-600 border border-red-400 text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                    title="Delete image"
+                  >
+                    <Trash2 className="size-3" />
+                  </button>
+                </div>
               );
               })}
 
