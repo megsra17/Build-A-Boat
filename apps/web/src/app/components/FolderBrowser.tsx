@@ -223,9 +223,6 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
     
     setError(null);
     try {
-      console.log('Delete request - JWT:', jwt ? 'Present' : 'Missing');
-      console.log('Delete request - URL:', mediaUrl);
-      
       const res = await fetch(`${apiUrl}/admin/media/delete`, {
         method: 'POST',
         headers: {
@@ -234,12 +231,9 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
         },
         body: JSON.stringify({ url: mediaUrl }),
       });
-
-      console.log('Delete response status:', res.status);
       
       if (!res.ok) {
         const errorText = await res.text();
-        console.log('Delete error response:', errorText);
         throw new Error(`Failed to delete image: ${res.status} ${errorText}`);
       }
 
