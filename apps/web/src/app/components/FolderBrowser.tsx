@@ -60,9 +60,9 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
           console.log('Files in folder:', fileData);
           
           const mediaItems: Media[] = (fileData.files || []).map((file: { Key: string; Url: string }) => ({
-            id: file.Key,
-            url: file.Url,
-            label: file.Key.split('/').pop()
+            id: file.Key || '',
+            url: file.Url || '',
+            label: file.Key ? file.Key.split('/').pop() : 'Unnamed'
           }));
           setMedia(mediaItems);
         } else {
@@ -492,7 +492,7 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
               {/* Images */}
               {media.map((m) => {
                 console.log('Rendering media item:', { id: m.id, url: m.url, label: m.label });
-                const fileName = m.fileName || m.label || m.id.split('/').pop() || 'Unnamed';
+                const fileName = m.fileName || m.label || (m.id && typeof m.id === 'string' ? m.id.split('/').pop() : null) || 'Unnamed';
                 return (
                 <button
                   key={m.id}
