@@ -154,33 +154,16 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
         body: formData,
       });
 
-      // If folder upload fails with 500, try regular upload
-      if (!res.ok && !useRegularUpload && res.status === 500) {
-        
-        // Create new FormData for retry
-        const retryFormData = new FormData();
-        retryFormData.append('file', file);
-        
-        res = await fetch(`${apiUrl}/admin/media/upload`, {
-          method: 'POST',
-          headers: jwt ? { Authorization: `Bearer ${jwt}` } : {},
-          body: retryFormData,
-        });
-      }
+      console.log('Upload response status:', res.status, 'Upload path:', uploadPath);
 
       if (!res.ok) {
         const errorText = await res.text();
-        console.error('Upload error:', errorText);
-        
-        // If both folder and regular uploads fail, suggest using the simple media picker
-        if (res.status === 500) {
-          throw new Error(`Upload failed: Database error. Try using the simple media picker instead of the folder browser, or check S3 permissions.`);
-        }
-        
+        console.error('Upload error:', errorText, 'Status:', res.status);
         throw new Error(`Upload failed: ${res.status} ${errorText}`);
       }
 
       const uploadedMedia = await res.json();
+      console.log('Upload successful:', uploadedMedia);
       
       // Add to current media list and auto-select
       setMedia(prev => [uploadedMedia, ...prev]);
