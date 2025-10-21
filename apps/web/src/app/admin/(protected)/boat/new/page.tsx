@@ -607,10 +607,13 @@ export default function NewBoatPage() {
                     <button
                       type="button"
                       onClick={() => pick(m)}
-                      className="w-full h-full"
+                      className="w-full h-full flex flex-col"
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={m.url} alt={m.label ?? ""} className="w-full h-28 object-contain bg-black/10" />
+                      <img src={m.url} alt={m.label ?? ""} className="w-full h-20 object-contain bg-black/10 flex-1" />
+                      <div className="p-1 bg-black/60 text-xs text-white/80 truncate">
+                        {m.fileName || m.label || 'Unnamed'}
+                      </div>
                     </button>
                     <button
                       type="button"
