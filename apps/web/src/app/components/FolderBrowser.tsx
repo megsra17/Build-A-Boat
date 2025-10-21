@@ -35,8 +35,6 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
     setLoading(true);
     setError(null);
     try {
-      console.log('Loading directory for path:', currentPath);
-      
       // Always load folders for current path
       const folderRes = await fetch(`${apiUrl}/admin/media/folders?prefix=${currentPath}`, {
         headers: jwt ? { Authorization: `Bearer ${jwt}` } : {},
@@ -44,7 +42,6 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
       
       if (folderRes.ok) {
         const folderData = await folderRes.json();
-        console.log('Folder API response:', folderData);
         const cleanFolders = (folderData.folders || [])
           .filter((folder: unknown) => folder && typeof folder === 'string')
           .map((folder: string) => folder.replace(/\/+$/, ''));
@@ -61,11 +58,6 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
         
         if (fileRes.ok) {
           const fileData = await fileRes.json();
-          console.log('Files in folder:', fileData);
-          console.log('Individual file objects:');
-          (fileData.files || []).forEach((file: unknown, index: number) => {
-            console.log(`File ${index}:`, file);
-          });
           
           try {
             const mediaItems: Media[] = (fileData.files || [])
@@ -89,7 +81,6 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
                 label: (file.key || file.Key) && typeof (file.key || file.Key) === 'string' ? 
                   (file.key || file.Key)!.split('/').pop() : 'Unnamed'
               }));
-            console.log('Processed media items:', mediaItems);
             setMedia(mediaItems);
           } catch (mediaError) {
             console.error('Error processing media items:', mediaError);
@@ -156,10 +147,7 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
         uploadPath = `${apiUrl}/admin/media/upload`;
         useRegularUpload = true;
       }
-      
-      console.log('Upload path:', uploadPath);
-      console.log('Current path:', currentPath);
-      
+
       let res = await fetch(uploadPath, {
         method: 'POST',
         headers: jwt ? { Authorization: `Bearer ${jwt}` } : {},
@@ -168,7 +156,6 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
 
       // If folder upload fails with 500, try regular upload
       if (!res.ok && !useRegularUpload && res.status === 500) {
-        console.log('Folder upload failed, trying regular upload...');
         
         // Create new FormData for retry
         const retryFormData = new FormData();
@@ -194,7 +181,6 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
       }
 
       const uploadedMedia = await res.json();
-      console.log('Upload successful:', uploadedMedia);
       
       // Add to current media list and auto-select
       setMedia(prev => [uploadedMedia, ...prev]);
@@ -607,7 +593,6 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
 
               {/* Images */}
               {media.map((m) => {
-                console.log('Rendering media item:', { id: m.id, url: m.url, label: m.label });
                 const fileName = m.fileName || m.label || (m.id && typeof m.id === 'string' ? m.id.split('/').pop() : null) || 'Unnamed';
                 return (
                 <div key={m.id} className="relative group">
@@ -622,9 +607,7 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
                       src={m.url} 
                       alt={m.label ?? ''} 
                       className="w-full flex-1 object-contain bg-black/20" 
-                      onLoad={() => console.log('Image loaded successfully:', m.url)}
                       onError={(e) => {
-                        console.error('Failed to load image:', m.url);
                         (e.target as HTMLImageElement).src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23333" width="100" height="100"/%3E%3Ctext x="50" y="50" font-size="12" fill="%23999" text-anchor="middle" dominant-baseline="middle"%3EFailed to load%3C/text%3E%3C/svg%3E';
                       }}
                     />
