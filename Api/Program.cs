@@ -312,8 +312,8 @@ app.MapGet("/debug/all-media", async (AppDb db) =>
     try
     {
         var allMedia = await db.Media.ToListAsync();
-        return Results.Ok(new 
-        { 
+        return Results.Ok(new
+        {
             count = allMedia.Count,
             media = allMedia.Select(m => new { m.Id, m.Url, m.FileName, m.UploadedAt }).ToList()
         });
@@ -1138,9 +1138,15 @@ admin.MapDelete("/media/{id:guid}", async (Guid id, AppDb db, IS3Service s3Servi
 
     try
     {
-        // Delete from S3 if it's an S3 URL
+        // Delete from S3 if it's an S3 or CloudFront URL
         var s3BucketName = Environment.GetEnvironmentVariable("AWS_S3_BUCKET");
-        if (!string.IsNullOrEmpty(s3BucketName) && media.Url.Contains(s3BucketName))
+        var cloudFrontDomain = Environment.GetEnvironmentVariable("CLOUDFRONT_DOMAIN");
+
+        // Check if it's an S3 or CloudFront URL
+        bool isS3Url = !string.IsNullOrEmpty(s3BucketName) && media.Url.Contains(s3BucketName);
+        bool isCloudFrontUrl = !string.IsNullOrEmpty(cloudFrontDomain) && media.Url.Contains(cloudFrontDomain);
+
+        if (isS3Url || isCloudFrontUrl)
         {
             Console.WriteLine($"[S3] Deleting file: {media.Url}");
             var deleted = await s3Service.DeleteFileAsync(media.Url);
@@ -1334,9 +1340,15 @@ admin.MapPost("/media/delete", async (HttpRequest req, AppDb db, IS3Service s3Se
 
     try
     {
-        // Delete from S3 if it's an S3 URL
+        // Delete from S3 if it's an S3 or CloudFront URL
         var s3BucketName = Environment.GetEnvironmentVariable("AWS_S3_BUCKET");
-        if (!string.IsNullOrEmpty(s3BucketName) && media.Url.Contains(s3BucketName))
+        var cloudFrontDomain = Environment.GetEnvironmentVariable("CLOUDFRONT_DOMAIN");
+
+        // Check if it's an S3 or CloudFront URL
+        bool isS3Url = !string.IsNullOrEmpty(s3BucketName) && media.Url.Contains(s3BucketName);
+        bool isCloudFrontUrl = !string.IsNullOrEmpty(cloudFrontDomain) && media.Url.Contains(cloudFrontDomain);
+
+        if (isS3Url || isCloudFrontUrl)
         {
             Console.WriteLine($"[S3] Deleting file: {media.Url}");
             var deleted = await s3Service.DeleteFileAsync(media.Url);
