@@ -306,6 +306,24 @@ app.MapGet("/debug/s3-config", () =>
     });
 });
 
+// Check all media in database
+app.MapGet("/debug/all-media", async (AppDb db) =>
+{
+    try
+    {
+        var allMedia = await db.Media.ToListAsync();
+        return Results.Ok(new 
+        { 
+            count = allMedia.Count,
+            media = allMedia.Select(m => new { m.Id, m.Url, m.FileName, m.UploadedAt }).ToList()
+        });
+    }
+    catch (Exception ex)
+    {
+        return Results.Ok(new { error = ex.Message, stack = ex.StackTrace });
+    }
+});
+
 // User check endpoint that works in production
 app.MapGet("/debug/users", async (AppDb db) =>
 {
