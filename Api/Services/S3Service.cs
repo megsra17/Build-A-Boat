@@ -64,9 +64,9 @@ public class S3Service : IS3Service
             var key = uri.AbsolutePath.TrimStart('/');
 
             Console.WriteLine($"[S3Service] DeleteFileAsync - Bucket: {_bucketName}, Key: {key}");
-            
+
             await _s3Client.DeleteObjectAsync(_bucketName, key);
-            
+
             Console.WriteLine($"[S3Service] Successfully deleted file from S3: {key}");
             return true;
         }

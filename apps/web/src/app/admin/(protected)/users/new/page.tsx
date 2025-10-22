@@ -22,7 +22,9 @@ export default function NewUserPage() {
     const [timezone, setTimezone] = useState("UTC");
 
     const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
-    const [avatarUrl, setAvatarUrl] = useState<string | undefined>(undefined); // In real life, upload -> URL
+    const [avatarUrl, setAvatarUrl] = useState<string | undefined>(undefined);
+    const [avatarFile, setAvatarFile] = useState<File | null>(null);
+    const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
@@ -37,12 +39,46 @@ export default function NewUserPage() {
         if(!f){
             return;
         }
+        
+        // Show preview
         const reader = new FileReader();
         reader.onload = () => setAvatarPreview(String(reader.result));
         reader.readAsDataURL(f);
 
-        //TODO: upload to server or S3
-        setAvatarUrl(undefined);
+        // Store file for upload
+        setAvatarFile(f);
+        setUploadingAvatar(true);
+
+        // Upload to S3
+        uploadAvatarToS3(f);
+    }
+
+    async function uploadAvatarToS3(file: File) {
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const response = await fetch('/admin/media/upload/avatars', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
+                body: formData
+            });
+
+            if (!response.ok) {
+                throw new Error(`Upload failed: ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            setAvatarUrl(data.url);
+            setError("");
+        } catch (err) {
+            console.error('Avatar upload error:', err);
+            setError(`Failed to upload avatar: ${err instanceof Error ? err.message : 'Unknown error'}`);
+        } finally {
+            setUploadingAvatar(false);
+        }
     }
 
     async function onSubmit(e: React.FormEvent) {
@@ -103,7 +139,7 @@ export default function NewUserPage() {
         {/* Avatar upload */}
         <div className="lg:col-span-4 xl:col-span-3 flex items-center justify-center">
           <div
-            className="relative size-72 rounded-full bg-black/60 border border-white/10 flex items-center justify-center overflow-hidden"
+            className="relative size-72 rounded-full bg-black/60 border border-white/10 flex items-center justify-center overflow-hidden cursor-pointer hover:border-white/20 transition-colors"
             onClick={onPickAvatar}
             role="button"
           >
@@ -115,6 +151,11 @@ export default function NewUserPage() {
                 <Upload className="size-20 mb-3" />
                 <div>Upload Avatar</div>
                 <div className="text-xs text-white/40">PNG/JPG</div>
+              </div>
+            )}
+            {uploadingAvatar && (
+              <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                <div className="text-sm text-white/80">Uploading...</div>
               </div>
             )}
             <input
