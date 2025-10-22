@@ -123,3 +123,6 @@
 /Users/Megan/Desktop/Build A Boat/Api/bin/Debug/net9.0/AWSSDK.Core.dll
 /Users/Megan/Desktop/Build A Boat/Api/bin/Debug/net9.0/AWSSDK.Extensions.NETCore.Setup.dll
 /Users/Megan/Desktop/Build A Boat/Api/bin/Debug/net9.0/AWSSDK.S3.dll
+/Users/meganrakow/Desktop/Build-A-Boat/Api/bin/Debug/net9.0/AWSSDK.Core.dll
+/Users/meganrakow/Desktop/Build-A-Boat/Api/bin/Debug/net9.0/AWSSDK.Extensions.NETCore.Setup.dll
+/Users/meganrakow/Desktop/Build-A-Boat/Api/bin/Debug/net9.0/AWSSDK.S3.dll

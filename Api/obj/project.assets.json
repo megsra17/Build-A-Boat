@@ -6286,19 +6286,19 @@
     ]
   },
   "packageFolders": {
-    "/Users/Megan/.nuget/packages/": {}
+    "/Users/meganrakow/.nuget/packages/": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "/Users/Megan/Desktop/Build A Boat/Api/Api.csproj",
+      "projectUniqueName": "/Users/meganrakow/Desktop/Build-A-Boat/Api/Api.csproj",
       "projectName": "Api",
-      "projectPath": "/Users/Megan/Desktop/Build A Boat/Api/Api.csproj",
-      "packagesPath": "/Users/Megan/.nuget/packages/",
-      "outputPath": "/Users/Megan/Desktop/Build A Boat/Api/obj/",
+      "projectPath": "/Users/meganrakow/Desktop/Build-A-Boat/Api/Api.csproj",
+      "packagesPath": "/Users/meganrakow/.nuget/packages/",
+      "outputPath": "/Users/meganrakow/Desktop/Build-A-Boat/Api/obj/",
       "projectStyle": "PackageReference",
       "configFilePaths": [
-        "/Users/Megan/.nuget/NuGet/NuGet.Config"
+        "/Users/meganrakow/.nuget/NuGet/NuGet.Config"
       ],
       "originalTargetFrameworks": [
         "net9.0"
@@ -6388,7 +6388,7 @@
             "privateAssets": "all"
           }
         },
-        "runtimeIdentifierGraphPath": "/usr/local/share/dotnet/sdk/9.0.301/PortableRuntimeIdentifierGraph.json"
+        "runtimeIdentifierGraphPath": "/usr/local/share/dotnet/sdk/9.0.305/PortableRuntimeIdentifierGraph.json"
       }
     }
   }

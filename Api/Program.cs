@@ -1295,12 +1295,24 @@ admin.MapPost("/media/delete", async (HttpRequest req, AppDb db, IS3Service s3Se
 {
     var body = await req.ReadFromJsonAsync<JsonElement>();
     var url = body.GetProperty("url").GetString();
-    
+
     if (string.IsNullOrEmpty(url))
         return Results.BadRequest(new { message = "URL is required" });
 
+    Console.WriteLine($"[DELETE] Looking for media with URL: {url}");
+
     var media = await db.Media.FirstOrDefaultAsync(m => m.Url == url);
-    if (media is null) return Results.NotFound();
+    if (media is null)
+    {
+        // Log all media URLs in database for debugging
+        var allMedia = await db.Media.ToListAsync();
+        Console.WriteLine($"[DELETE] Media not found. Database contains {allMedia.Count} media records:");
+        foreach (var m in allMedia.Take(5))
+        {
+            Console.WriteLine($"  - ID: {m.Id}, URL: {m.Url}");
+        }
+        return Results.NotFound(new { message = "Media not found", searchedUrl = url, databaseCount = allMedia.Count });
+    }
 
     try
     {
@@ -1335,7 +1347,7 @@ admin.MapPost("/media/folder/delete", async (HttpRequest req, AppDb db, IS3Servi
 {
     var body = await req.ReadFromJsonAsync<JsonElement>();
     var folderPath = body.GetProperty("folderPath").GetString();
-    
+
     if (string.IsNullOrEmpty(folderPath))
         return Results.BadRequest(new { message = "Folder path is required" });
 
@@ -1343,7 +1355,7 @@ admin.MapPost("/media/folder/delete", async (HttpRequest req, AppDb db, IS3Servi
     {
         // Get all files in the folder from S3
         var files = await s3Service.ListFilesInFolderAsync(folderPath);
-        
+
         // Delete each file from S3 and database
         foreach (var file in files)
         {
