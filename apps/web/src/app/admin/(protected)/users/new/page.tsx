@@ -58,16 +58,22 @@ export default function NewUserPage() {
             const formData = new FormData();
             formData.append('file', file);
 
+            const token = localStorage.getItem('token');
+            if (!token) {
+                throw new Error('No authentication token found');
+            }
+
             const response = await fetch('/admin/media/upload/avatars', {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    'Authorization': `Bearer ${token}`
                 },
                 body: formData
             });
 
             if (!response.ok) {
-                throw new Error(`Upload failed: ${response.statusText}`);
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(`Upload failed: ${response.status} ${response.statusText}. ${errorData.message || ''}`);
             }
 
             const data = await response.json();

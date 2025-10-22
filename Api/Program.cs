@@ -1012,6 +1012,124 @@ admin.MapPost("/media", async (MediaCreateDto dto, AppDb db) =>
     return Results.Created($"/admin/media/{m.Id}", m);
 });
 
+//upload to specific folder (MUST come before /media/upload)
+admin.MapPost("/media/upload/{*folderPath}", async (string folderPath, HttpRequest req, IWebHostEnvironment env, AppDb db, IS3Service s3Service) =>
+{
+    if (!req.HasFormContentType)
+        return Results.BadRequest(new { message = "Invalid form data" });
+
+    var form = await req.ReadFormAsync();
+    var file = form.Files.GetFile("file");
+    if (file is null || file.Length == 0)
+        return Results.BadRequest(new { message = "No file uploaded" });
+
+    // Validate file type and size
+    var allowedTypes = new[] { "image/jpeg", "image/png", "image/gif", "image/webp" };
+    if (!allowedTypes.Contains(file.ContentType))
+        return Results.BadRequest(new { message = "Only image files are allowed" });
+
+    if (file.Length > 10 * 1024 * 1024) // 10MB limit
+        return Results.BadRequest(new { message = "File size must be less than 10MB" });
+
+    try
+    {
+        // Option 1: AWS S3 (Production)
+        var s3BucketName = Environment.GetEnvironmentVariable("AWS_S3_BUCKET");
+        if (!string.IsNullOrEmpty(s3BucketName))
+        {
+            Console.WriteLine($"[S3] Uploading file: {file.FileName} to folder: {folderPath}");
+            var s3Url = await s3Service.UploadFileAsync(file, folderPath);
+            Console.WriteLine($"[S3] File uploaded successfully: {s3Url}");
+
+            if (string.IsNullOrEmpty(s3Url))
+            {
+                Console.WriteLine("[S3] ERROR: S3 service returned empty URL for folder upload");
+                return Results.Problem("S3 upload returned empty URL");
+            }
+
+            var m = new Media
+            {
+                Id = Guid.NewGuid(),
+                FileName = file.FileName,
+                ContentType = file.ContentType,
+                Url = s3Url,
+                UploadedAt = DateTime.UtcNow
+            };
+
+            try
+            {
+                Console.WriteLine($"[S3] Adding media to context: Id={m.Id}, Url={m.Url}, FileName={m.FileName}, FolderPath={folderPath}");
+                db.Media.Add(m);
+                await db.SaveChangesAsync();
+                Console.WriteLine($"[S3] Media saved to database with ID: {m.Id}");
+            }
+            catch (DbUpdateException dbEx)
+            {
+                Console.WriteLine($"[ERROR] Database update error: {dbEx.Message}");
+                Console.WriteLine($"[ERROR] Entries: {string.Join(", ", dbEx.Entries.Select(e => $"{e.Entity.GetType().Name}:{e.State}"))}");
+                if (dbEx.InnerException != null)
+                {
+                    Console.WriteLine($"[ERROR] Inner exception: {dbEx.InnerException.Message}");
+                    Console.WriteLine($"[ERROR] Inner stacktrace: {dbEx.InnerException.StackTrace}");
+                }
+                if (dbEx.InnerException?.InnerException != null)
+                {
+                    Console.WriteLine($"[ERROR] Inner inner exception: {dbEx.InnerException.InnerException.Message}");
+                }
+                return Results.Problem($"Database error: {dbEx.InnerException?.Message ?? dbEx.Message}");
+            }
+            catch (Exception dbEx)
+            {
+                Console.WriteLine($"[ERROR] Database save error: {dbEx.GetType().Name}: {dbEx.Message}");
+                Console.WriteLine($"[ERROR] Stacktrace: {dbEx.StackTrace}");
+                if (dbEx.InnerException != null)
+                {
+                    Console.WriteLine($"[ERROR] Inner exception: {dbEx.InnerException.Message}");
+                }
+                return Results.Problem($"Database error: {dbEx.InnerException?.Message ?? dbEx.Message}");
+            }
+
+            return Results.Created($"/admin/media/{m.Id}", m);
+        }
+
+        // Option 2: Local file storage (Development only)
+        if (env.IsDevelopment())
+        {
+            var uploadsDir = Path.Combine(env.WebRootPath ?? env.ContentRootPath, "uploads", folderPath);
+            Directory.CreateDirectory(uploadsDir);
+
+            var fileName = $"{Guid.NewGuid()}_{file.FileName}";
+            var filePath = Path.Combine(uploadsDir, fileName);
+
+            using var stream = File.Create(filePath);
+            await file.CopyToAsync(stream);
+
+            var fileUrl = $"/uploads/{folderPath}/{fileName}";
+
+            var m = new Media
+            {
+                Id = Guid.NewGuid(),
+                FileName = file.FileName,
+                ContentType = file.ContentType,
+                Url = fileUrl,
+                UploadedAt = DateTime.UtcNow
+            };
+            db.Media.Add(m);
+            await db.SaveChangesAsync();
+            return Results.Created($"/admin/media/{m.Id}", m);
+        }
+
+        // Fallback: Return error if no storage method is configured
+        return Results.Problem("No file storage method configured. Set AWS_S3_BUCKET environment variable or run in development mode.");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Media upload error: {ex.Message}");
+        Console.WriteLine($"Stack trace: {ex.StackTrace}");
+        return Results.Problem($"Upload failed: {ex.Message}");
+    }
+});
+
 //upload media - redirect to media folder
 admin.MapPost("/media/upload", async (HttpRequest req, IWebHostEnvironment env, AppDb db, IS3Service s3Service) =>
 {
@@ -1194,124 +1312,6 @@ admin.MapGet("/media/folder/{*path}", async (string path, IS3Service s3Service) 
 {
     var files = await s3Service.ListFilesInFolderAsync(path);
     return Results.Ok(new { files });
-});
-
-//upload to specific folder
-admin.MapPost("/media/upload/{*folderPath}", async (string folderPath, HttpRequest req, IWebHostEnvironment env, AppDb db, IS3Service s3Service) =>
-{
-    if (!req.HasFormContentType)
-        return Results.BadRequest(new { message = "Invalid form data" });
-
-    var form = await req.ReadFormAsync();
-    var file = form.Files.GetFile("file");
-    if (file is null || file.Length == 0)
-        return Results.BadRequest(new { message = "No file uploaded" });
-
-    // Validate file type and size
-    var allowedTypes = new[] { "image/jpeg", "image/png", "image/gif", "image/webp" };
-    if (!allowedTypes.Contains(file.ContentType))
-        return Results.BadRequest(new { message = "Only image files are allowed" });
-
-    if (file.Length > 10 * 1024 * 1024) // 10MB limit
-        return Results.BadRequest(new { message = "File size must be less than 10MB" });
-
-    try
-    {
-        // Option 1: AWS S3 (Production)
-        var s3BucketName = Environment.GetEnvironmentVariable("AWS_S3_BUCKET");
-        if (!string.IsNullOrEmpty(s3BucketName))
-        {
-            Console.WriteLine($"[S3] Uploading file: {file.FileName} to folder: {folderPath}");
-            var s3Url = await s3Service.UploadFileAsync(file, folderPath);
-            Console.WriteLine($"[S3] File uploaded successfully: {s3Url}");
-
-            if (string.IsNullOrEmpty(s3Url))
-            {
-                Console.WriteLine("[S3] ERROR: S3 service returned empty URL for folder upload");
-                return Results.Problem("S3 upload returned empty URL");
-            }
-
-            var m = new Media
-            {
-                Id = Guid.NewGuid(),
-                FileName = file.FileName,
-                ContentType = file.ContentType,
-                Url = s3Url,
-                UploadedAt = DateTime.UtcNow
-            };
-
-            try
-            {
-                Console.WriteLine($"[S3] Adding media to context: Id={m.Id}, Url={m.Url}, FileName={m.FileName}, FolderPath={folderPath}");
-                db.Media.Add(m);
-                await db.SaveChangesAsync();
-                Console.WriteLine($"[S3] Media saved to database with ID: {m.Id}");
-            }
-            catch (DbUpdateException dbEx)
-            {
-                Console.WriteLine($"[ERROR] Database update error: {dbEx.Message}");
-                Console.WriteLine($"[ERROR] Entries: {string.Join(", ", dbEx.Entries.Select(e => $"{e.Entity.GetType().Name}:{e.State}"))}");
-                if (dbEx.InnerException != null)
-                {
-                    Console.WriteLine($"[ERROR] Inner exception: {dbEx.InnerException.Message}");
-                    Console.WriteLine($"[ERROR] Inner stacktrace: {dbEx.InnerException.StackTrace}");
-                }
-                if (dbEx.InnerException?.InnerException != null)
-                {
-                    Console.WriteLine($"[ERROR] Inner inner exception: {dbEx.InnerException.InnerException.Message}");
-                }
-                return Results.Problem($"Database error: {dbEx.InnerException?.Message ?? dbEx.Message}");
-            }
-            catch (Exception dbEx)
-            {
-                Console.WriteLine($"[ERROR] Database save error: {dbEx.GetType().Name}: {dbEx.Message}");
-                Console.WriteLine($"[ERROR] Stacktrace: {dbEx.StackTrace}");
-                if (dbEx.InnerException != null)
-                {
-                    Console.WriteLine($"[ERROR] Inner exception: {dbEx.InnerException.Message}");
-                }
-                return Results.Problem($"Database error: {dbEx.InnerException?.Message ?? dbEx.Message}");
-            }
-
-            return Results.Created($"/admin/media/{m.Id}", m);
-        }
-
-        // Option 2: Local file storage (Development only)
-        if (env.IsDevelopment())
-        {
-            var uploadsDir = Path.Combine(env.WebRootPath ?? env.ContentRootPath, "uploads", folderPath);
-            Directory.CreateDirectory(uploadsDir);
-
-            var fileName = $"{Guid.NewGuid()}_{file.FileName}";
-            var filePath = Path.Combine(uploadsDir, fileName);
-
-            using var stream = File.Create(filePath);
-            await file.CopyToAsync(stream);
-
-            var fileUrl = $"/uploads/{folderPath}/{fileName}";
-
-            var m = new Media
-            {
-                Id = Guid.NewGuid(),
-                FileName = file.FileName,
-                ContentType = file.ContentType,
-                Url = fileUrl,
-                UploadedAt = DateTime.UtcNow
-            };
-            db.Media.Add(m);
-            await db.SaveChangesAsync();
-            return Results.Created($"/admin/media/{m.Id}", m);
-        }
-
-        // Fallback: Return error if no storage method is configured
-        return Results.Problem("No file storage method configured. Set AWS_S3_BUCKET environment variable or run in development mode.");
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"Media upload error: {ex.Message}");
-        Console.WriteLine($"Stack trace: {ex.StackTrace}");
-        return Results.Problem($"Upload failed: {ex.Message}");
-    }
 });
 
 // Delete media by URL
