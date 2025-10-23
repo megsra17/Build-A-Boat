@@ -1,443 +1,305 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { BoatsApi, CategoriesApi } from "@/app/lib/admin-api";
-import { Check, X, ChevronDown } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Check, X, PencilLine } from "lucide-react";
 
-type Summary = {
+// Adjust to your types
+type Category = { id: string; name: string };
+type Boat = {
   id: string;
   modelYear: number;
   name: string;
-  category: string; // category name or id, adjust as needed
+  categoryId: string | null;
+  categoryName?: string;
   msrp?: number | null;
-
-  primaryImageUrl?: string | null;
-  secondaryImageUrl?: string | null;
-  sideImageUrl?: string | null;
-  logoUrl?: string | null;
-
-  builderLayerUrl?: string | null;
+  heroImageUrl?: string;        
+  primaryImageUrl?: string;     
+  secondaryImageUrl?: string;
+  sideImageUrl?: string;
+  graphicLogoUrl?: string;
 };
 
-type Props = {
-  boatId: string;
-  initial: Summary;
-  onUpdated?: (next: Summary) => void;
+// Stub; replace with your lib
+const BoatsApi = {
+  update: async (id: string, body: any) => {
+    const res = await fetch(`/api/admin/boats/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  },
 };
 
-export default function BoatSummaryCard({ boatId, initial, onUpdated }: Props) {
-  const [mode, setMode] = useState<"read" | "edit">("read");
+function money(n?: number | null) {
+  if (n == null) return "—";
+  return n.toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+}
+
+export default function BoatTopSection({
+  boat,
+  categories,
+  onUpdated, // callback(boat) when saved
+}: {
+  boat: Boat;
+  categories: Category[];
+  onUpdated?: (b: Boat) => void;
+}) {
+  const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  const [value, setValue] = useState<Summary>(initial);
-  const [form, setForm] = useState<Summary>(initial);
+  // local form state for edit mode
+  const [modelYear, setModelYear] = useState(boat.modelYear ?? new Date().getFullYear());
+  const [name, setName] = useState(boat.name ?? "");
+  const [categoryId, setCategoryId] = useState<string | "">(boat.categoryId ?? "");
+  const [msrp, setMsrp] = useState(boat.msrp ?? undefined);
 
-  // categories for dropdown
-  const [categories, setCategories] = useState<string[]>([]);
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await CategoriesApi.list({ page: 1, pageSize: 100 });
-        setCategories(res.items.map((r: { name: string }) => r.name));
-      } catch {
-        setCategories([]);
-      }
-    })();
-  }, []);
+  const [primary, setPrimary] = useState(boat.primaryImageUrl ?? "");
+  const [secondary, setSecondary] = useState(boat.secondaryImageUrl ?? "");
+  const [side, setSide] = useState(boat.sideImageUrl ?? "");
+  const [logo, setLogo] = useState(boat.graphicLogoUrl ?? "");
 
-  useEffect(() => {
-    setValue(initial);
-    setForm(initial);
-  }, [initial?.id]);
+  const catLabel = useMemo(
+    () => categories.find(c => c.id === (boat.categoryId ?? ""))?.name ?? boat.categoryName ?? "—",
+    [categories, boat.categoryId, boat.categoryName]
+  );
 
-  function change<K extends keyof Summary>(key: K, v: Summary[K]) {
-    setForm((f) => ({ ...f, [key]: v }));
+  function enterEdit() {
+    // seed form from current boat (safe if user cancelled previously)
+    setModelYear(boat.modelYear ?? new Date().getFullYear());
+    setName(boat.name ?? "");
+    setCategoryId(boat.categoryId ?? "");
+    setMsrp(boat.msrp ?? undefined);
+    setPrimary(boat.primaryImageUrl ?? "");
+    setSecondary(boat.secondaryImageUrl ?? "");
+    setSide(boat.sideImageUrl ?? "");
+    setLogo(boat.graphicLogoUrl ?? "");
+    setErr(null);
+    setEditing(true);
+  }
+
+  function cancel() {
+    setEditing(false);
+    setErr(null);
   }
 
   async function save() {
     setBusy(true);
     setErr(null);
     try {
-      const patch: Partial<Summary> = {
-        modelYear: Number(form.modelYear),
-        name: form.name?.trim(),
-        category: form.category,
-        msrp:
-          form.msrp === undefined || form.msrp === null || form.msrp === ("" as any)
-            ? null
-            : Number(form.msrp),
-
-        primaryImageUrl: form.primaryImageUrl?.trim() || null,
-        secondaryImageUrl: form.secondaryImageUrl?.trim() || null,
-        sideImageUrl: form.sideImageUrl?.trim() || null,
-        logoUrl: form.logoUrl?.trim() || null,
-
-        builderLayerUrl: form.builderLayerUrl?.trim() || null,
+      const payload = {
+        modelYear: Number(modelYear),
+        name: name.trim(),
+        categoryId: categoryId || null,
+        msrp: msrp ?? null,
+        primaryImageUrl: primary || null,
+        secondaryImageUrl: secondary || null,
+        sideImageUrl: side || null,
+        graphicLogoUrl: logo || null,
       };
-
-      const updated = await BoatsApi.updateSummary(boatId, patch);
-      setValue(updated);
-      setForm(updated);
-      setMode("read");
+      const updated = await BoatsApi.update(boat.id, payload);
       onUpdated?.(updated);
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
+      setEditing(false);
+    } catch (e: any) {
+      setErr(e?.message ?? "Failed to save.");
     } finally {
       setBusy(false);
     }
   }
 
-  function cancel() {
-    setForm(value);
-    setMode("read");
-    setErr(null);
-  }
-
-  return (
-    <section className="rounded-lg border border-white/10 bg-[#0e0e0e] p-4 md:p-6 relative">
-      {/* Title row */}
-      <div className="mb-2 flex items-center justify-between">
-        <h2 className="text-2xl font-semibold flex items-center gap-2">
-          {/* little boat glyph could be an inline svg if you want */}
-          ️🏁 <span>{value.modelYear} {value.name}</span>
-        </h2>
-
-        {/* edit controls, yellow circle icons */}
-        {mode === "edit" ? (
-          <div className="flex items-center gap-2">
-            <IconCircle
-              title="Cancel"
-              onClick={cancel}
-              className="border-yellow-400/60 text-yellow-300 hover:bg-yellow-500/10"
-            >
-              <X className="size-4" />
-            </IconCircle>
-            <IconCircle
-              title="Save"
-              onClick={save}
-              disabled={busy}
-              className="border-yellow-400/60 text-yellow-300 hover:bg-yellow-500/10 disabled:opacity-50"
-            >
-              <Check className="size-4" />
-            </IconCircle>
+  // READ-ONLY MODE
+  if (!editing) {
+    return (
+      <section className="relative rounded-lg bg-[#111] border border-white/10 p-5">
+        {/* header row */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2 text-white/90">
+            <svg width="20" height="20" viewBox="0 0 24 24" className="opacity-80"><path fill="currentColor" d="M3 19h18v2H3zm14-8l5 6H2l6-7l4 5zM7 7a3 3 0 1 1 6 0a3 3 0 0 1-6 0"/></svg>
+            <h2 className="text-xl font-semibold">{boat.modelYear} {boat.name}</h2>
           </div>
-        ) : (
-          <IconCircle
-            title="Edit"
-            onClick={() => setMode("edit")}
-            className="border-yellow-400/60 text-yellow-300 hover:bg-yellow-500/10"
+          <button
+            onClick={enterEdit}
+            className="inline-flex items-center gap-2 rounded-full border border-yellow-500/40 text-yellow-400 hover:bg-yellow-500/10 px-3 py-1.5 text-sm"
+            aria-label="Edit top section"
           >
-            {/* pencil-ish: use X rotated? keep simple */}
-            ✎
-          </IconCircle>
-        )}
-      </div>
-
-      {/* Basic Info row */}
-      <h3 className="text-lg font-semibold mb-1">Basic Info</h3>
-      {mode === "read" ? (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
-          <ReadField label="Model Year" value={value.modelYear} />
-          <ReadField label="Name" value={value.name} />
-          <ReadField label="Category" value={value.category || "—"} />
-          <ReadField label="MSRP" value={formatMoney(value.msrp)} />
+            <PencilLine className="size-4" />
+          </button>
         </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
-          <Labeled>
-            <Label>Model Year</Label>
-            <Input
-              type="number"
-              value={form.modelYear}
-              onChange={(e) => change("modelYear", Number(e.target.value))}
-            />
-          </Labeled>
-          <Labeled>
-            <Label>Name</Label>
-            <Input
-              value={form.name ?? ""}
-              onChange={(e) => change("name", e.target.value)}
-            />
-          </Labeled>
-          <Labeled>
-            <Label>Category</Label>
-            <Dropdown
-              value={form.category ?? ""}
-              onChange={(v) => change("category", v)}
-              options={categories}
-            />
-          </Labeled>
-          <Labeled>
-            <Label>MSRP</Label>
-            <Input
-              type="number"
-              step="0.01"
-              value={form.msrp ?? ""}
-              onChange={(e) =>
-                change("msrp", e.target.value === "" ? null : Number(e.target.value))
-              }
-            />
-          </Labeled>
-        </div>
-      )}
 
-      {/* General Images */}
-      <h3 className="text-lg font-semibold mb-3">General Images</h3>
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-        <ImagePicker
-          label="Primary Image"
-          url={mode === "edit" ? form.primaryImageUrl : value.primaryImageUrl}
-          editable={mode === "edit"}
-          onChange={(u) => change("primaryImageUrl", u)}
-        />
-        <ImagePicker
-          label="Secondary Image"
-          url={mode === "edit" ? form.secondaryImageUrl : value.secondaryImageUrl}
-          editable={mode === "edit"}
-          onChange={(u) => change("secondaryImageUrl", u)}
-          circle // screenshot shows circular crop on secondary
-        />
-        <ImagePicker
-          label="Side Image"
-          url={mode === "edit" ? form.sideImageUrl : value.sideImageUrl}
-          editable={mode === "edit"}
-          onChange={(u) => change("sideImageUrl", u)}
-        />
-        <ImagePicker
-          label="Graphic Logo"
-          url={mode === "edit" ? form.logoUrl : value.logoUrl}
-          editable={mode === "edit"}
-          onChange={(u) => change("logoUrl", u)}
-        />
-      </div>
-
-      {/* Builder Layers */}
-      <div className="mt-10">
-        <h3 className="text-lg font-semibold mb-2">Builder Layers</h3>
-        {mode === "edit" ? (
-          <div className="flex items-start gap-6">
-            <button
-              type="button"
-              onClick={() => {
-                // hook up your media selector; for now just prompt for URL
-                const u = prompt("Enter builder layer image URL");
-                if (u) change("builderLayerUrl", u);
-              }}
-              className="rounded-full border border-yellow-400/60 text-yellow-200 px-4 py-2 hover:bg-yellow-500/10"
-            >
-              Select Media
-            </button>
-            {form.builderLayerUrl && (
-              <ThumbWithRemove
-                url={form.builderLayerUrl}
-                onRemove={() => change("builderLayerUrl", null)}
-              />
+        <div className="grid grid-cols-[380px_1fr] gap-8">
+          {/* hero / static image */}
+          <div className="rounded-lg bg-black/40 aspect-[16/9] flex items-center justify-center overflow-hidden">
+            {boat.heroImageUrl ? (
+              <img src={boat.heroImageUrl} className="w-full h-full object-contain" alt="" />
+            ) : (
+              <div className="text-white/40 text-sm">No image</div>
             )}
           </div>
-        ) : (
-          value.builderLayerUrl && (
-            <div className="mt-2">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={value.builderLayerUrl}
-                alt=""
-                className="h-28 w-auto rounded-md border border-white/10 bg-black/30 object-contain"
-              />
-            </div>
-          )
-        )}
+
+          {/* quick specs */}
+          <dl className="grid grid-cols-[160px_1fr] gap-x-6 gap-y-3 text-[15px]">
+            <dt className="text-white/50">Model Year:</dt><dd>{boat.modelYear ?? "—"}</dd>
+            <dt className="text-white/50">Name:</dt><dd>{boat.name ?? "—"}</dd>
+            <dt className="text-white/50">Category:</dt><dd>{catLabel}</dd>
+            <dt className="text-white/50">MSRP:</dt><dd>{money(boat.msrp)}</dd>
+            {/* Add Start Build Link here if you store it */}
+          </dl>
+        </div>
+      </section>
+    );
+  }
+
+  // EDIT MODE
+  return (
+    <section className="relative rounded-lg bg-[#0f0f0f] border border-yellow-500/30 p-5">
+      {/* header actions */}
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-xl font-semibold text-white/90">Basic Info</h2>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={cancel}
+            disabled={busy}
+            className="inline-flex items-center gap-2 rounded-full border border-yellow-500/40 text-yellow-300 hover:bg-yellow-500/10 px-3 py-1.5 text-sm"
+            aria-label="Cancel edits"
+          >
+            <X className="size-4" /> Cancel
+          </button>
+          <button
+            onClick={save}
+            disabled={busy}
+            className="inline-flex items-center gap-2 rounded-full bg-yellow-500 text-black hover:bg-yellow-400 px-3 py-1.5 text-sm"
+            aria-label="Save changes"
+          >
+            <Check className="size-4" /> {busy ? "Saving…" : "Save"}
+          </button>
+        </div>
       </div>
 
-      {err && <div className="mt-4 text-sm text-red-400">{err}</div>}
+      {err && <div className="mb-3 text-sm text-red-300 bg-red-900/30 border border-red-600/40 rounded px-3 py-2">{err}</div>}
+
+      {/* inputs row */}
+      <div className="grid lg:grid-cols-4 md:grid-cols-2 gap-8">
+        <Field label="Model Year">
+          <input
+            type="number"
+            className="w-full bg-transparent border-b border-white/30 focus:border-white/70 outline-none py-1"
+            value={modelYear}
+            onChange={e => setModelYear(Number(e.target.value))}
+          />
+        </Field>
+
+        <Field label="Name">
+          <input
+            type="text"
+            className="w-full bg-transparent border-b border-white/30 focus:border-white/70 outline-none py-1"
+            value={name}
+            onChange={e => setName(e.target.value)}
+          />
+        </Field>
+
+        <Field label="Category">
+          <div className="relative">
+            <select
+              className="w-full bg-transparent border-b border-white/30 focus:border-white/70 outline-none py-1 pr-6"
+              value={categoryId}
+              onChange={e => setCategoryId(e.target.value)}
+            >
+              <option value="">—</option>
+              {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+            <span className="pointer-events-none absolute right-0 top-1.5 text-white/60">▾</span>
+          </div>
+        </Field>
+
+        <Field label="MSRP">
+          <input
+            type="number"
+            inputMode="numeric"
+            min={0}
+            className="w-full bg-transparent border-b border-white/30 focus:border-white/70 outline-none py-1"
+            value={msrp ?? ""}
+            onChange={e => setMsrp(e.target.value === "" ? undefined : Number(e.target.value))}
+            placeholder="e.g. 125000"
+          />
+        </Field>
+      </div>
+
+      {/* image pickers – only shown in edit mode */}
+      <div className="mt-8">
+        <h3 className="text-lg font-medium text-white/90 mb-4">General Images</h3>
+        <div className="grid md:grid-cols-4 sm:grid-cols-2 gap-8">
+          <ImagePicker label="Primary Image" value={primary} onChange={setPrimary} />
+          <ImagePicker label="Secondary Image" value={secondary} onChange={setSecondary} />
+          <ImagePicker label="Side Image" value={side} onChange={setSide} />
+          <ImagePicker label="Graphic Logo" value={logo} onChange={setLogo} round />
+        </div>
+      </div>
     </section>
   );
 }
 
-/* ---------- little building blocks ---------- */
-
-function IconCircle({
-  children,
-  onClick,
-  title,
-  className = "",
-  disabled,
-}: {
-  children: React.ReactNode;
-  onClick?: () => void;
-  title?: string;
-  className?: string;
-  disabled?: boolean;
-}) {
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <button
-      type="button"
-      title={title}
-      disabled={disabled}
-      onClick={onClick}
-      className={`inline-grid place-items-center size-9 rounded-full border ${className}`}
-    >
+    <label className="block text-sm">
+      <div className="text-white/60 mb-1">{label}</div>
       {children}
-    </button>
+    </label>
   );
 }
 
-function Labeled({ children }: { children: React.ReactNode }) {
-  return <div>{children}</div>;
-}
-function Label({ children }: { children: React.ReactNode }) {
-  return <div className="text-xs text-white/60 mb-2">{children}</div>;
-}
-function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
-  return (
-    <input
-      {...props}
-      className={`w-full rounded-md bg-[#141414] border border-white/15 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-white/10 ${props.className ?? ""}`}
-    />
-  );
-}
-
-function ReadField({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div>
-      <div className="text-xs text-white/60 mb-2">{label}</div>
-      <div className="border-b border-white/20 pb-1">{value ?? "—"}</div>
-    </div>
-  );
-}
-
-function Dropdown({
-  value,
-  onChange,
-  options,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  options: string[];
-}) {
-  return (
-    <div className="relative">
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full appearance-none rounded-md bg-[#141414] border border-white/15 px-3 py-2 pr-8 text-sm outline-none focus:ring-2 focus:ring-white/10"
-      >
-        {options.length === 0 && <option value="">—</option>}
-        {options.map((o) => (
-          <option key={o} value={o}>
-            {o}
-          </option>
-        ))}
-      </select>
-      <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 size-4 text-white/60" />
-    </div>
-  );
-}
-
+// Replace this with your actual uploader/select component.
+// Keeping UX: preview when set, cloud-upload “drop” state when empty,
+// and a small remove button.
 function ImagePicker({
   label,
-  url,
-  editable,
+  value,
   onChange,
-  circle,
+  round,
 }: {
   label: string;
-  url?: string | null;
-  editable: boolean;
-  onChange: (next: string | null) => void;
-  circle?: boolean;
+  value?: string;
+  onChange: (url: string) => void;
+  round?: boolean;
 }) {
-  const has = !!url;
-
   return (
     <div>
-      <div className="text-white/80 mb-2">{label}</div>
+      <div className="text-white/70 text-sm mb-2">{label}</div>
       <div
-        className={`relative ${circle ? "size-64" : "w-72 h-56"} max-w-full overflow-hidden ${
-          circle ? "rounded-full" : "rounded-xl"
-        } border border-white/10 bg-black/40 grid place-items-center`}
+        className={[
+          "relative bg-black/50 border border-white/10 flex items-center justify-center overflow-hidden",
+          round ? "rounded-full size-56" : "rounded-xl aspect-square",
+        ].join(" ")}
       >
-        {has ? (
+        {value ? (
           <>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={url!}
-              alt=""
-              className={`h-full w-full object-contain ${circle ? "rounded-full" : ""}`}
-            />
-            {editable && (
-              <button
-                type="button"
-                title="Remove"
-                onClick={() => onChange(null)}
-                className="absolute -top-2 -right-2 grid place-items-center size-8 rounded-full border border-red-400/60 text-red-300 bg-black/60 hover:bg-red-500/10"
-              >
-                <X className="size-4" />
-              </button>
-            )}
+            <img src={value} className="w-full h-full object-cover" alt="" />
+            <button
+              type="button"
+              onClick={() => onChange("")}
+              className="absolute top-2 right-2 size-7 rounded-full bg-black/70 hover:bg-black/60 border border-white/20 text-white"
+              title="Remove"
+            >
+              ×
+            </button>
           </>
         ) : (
-          <>
-            <CloudGlyph />
-            {editable && (
-              <button
-                type="button"
-                onClick={() => {
-                  const u = prompt("Enter image URL");
-                  if (u) onChange(u);
-                }}
-                className="absolute inset-0"
-                aria-label="Choose image"
-                title="Choose image"
-              />
-            )}
-          </>
+          <button
+            type="button"
+            onClick={async () => {
+              // TODO: open your media picker/uploader and get a URL
+              // For now, prompt:
+              const url = prompt("Paste image URL");
+              if (url) onChange(url);
+            }}
+            className="flex flex-col items-center justify-center text-white/50 hover:text-white gap-2"
+          >
+            <svg width="54" height="54" viewBox="0 0 24 24"><path fill="currentColor" d="M20.79 10H19V7a5 5 0 0 0-10 0v3H6.21A3.21 3.21 0 0 0 3 13.21v2.58A3.21 3.21 0 0 0 6.21 19h14.58A3.21 3.21 0 0 0 24 15.79v-2.58A3.21 3.21 0 0 0 20.79 10M11 7a3 3 0 0 1 6 0v3h-6Zm10 8.79A1.21 1.21 0 0 1 19.79 17H6.21A1.21 1.21 0 0 1 5 15.79v-2.58A1.21 1.21 0 0 1 6.21 12H19.8a1.21 1.21 0 0 1 1.2 1.21Z"/></svg>
+            <span className="text-xs">Upload / Select</span>
+          </button>
         )}
       </div>
     </div>
   );
-}
-
-function ThumbWithRemove({ url, onRemove }: { url: string; onRemove: () => void }) {
-  return (
-    <div className="relative inline-block">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={url}
-        alt=""
-        className="h-28 w-auto rounded-md border border-white/10 bg-black/30 object-contain"
-      />
-      <button
-        type="button"
-        title="Remove"
-        onClick={onRemove}
-        className="absolute -top-2 -left-2 grid place-items-center size-8 rounded-full border border-red-400/60 text-red-300 bg-black/60 hover:bg-red-500/10"
-      >
-        <X className="size-4" />
-      </button>
-    </div>
-  );
-}
-
-function CloudGlyph() {
-  return (
-    <svg viewBox="0 0 24 24" className="w-16 h-16 text-white/70" fill="none" stroke="currentColor" strokeWidth="1.5">
-      <path d="M7 18h9a4 4 0 0 0 0-8 5 5 0 0 0-9.58-1.5A4.5 4.5 0 0 0 7 18Z" />
-      <path d="m12 13 0-6" />
-      <path d="m9.5 9.5 2.5-2.5 2.5 2.5" />
-    </svg>
-  );
-}
-
-function formatMoney(v?: number | null) {
-  if (v === null || v === undefined || Number.isNaN(v)) return "—";
-  try {
-    return new Intl.NumberFormat(undefined, {
-      style: "currency",
-      currency: "USD",
-      maximumFractionDigits: 0,
-    }).format(v);
-  } catch {
-    return `$${v}`;
-  }
 }
