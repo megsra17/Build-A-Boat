@@ -274,6 +274,15 @@ function ImagePicker({
   const [showBrowser, setShowBrowser] = useState(false);
   const jwt = typeof window !== 'undefined' ? (localStorage.getItem("jwt") || sessionStorage.getItem("jwt")) : null;
 
+  const getApiBase = () => {
+    if (typeof window !== 'undefined' && process.env.NODE_ENV === 'production') {
+      return process.env.NEXT_PUBLIC_API_BASE || 'https://build-a-boat-production.up.railway.app';
+    }
+    return process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5199";
+  };
+
+  const apiUrl = getApiBase();
+
   const handleSelectImage = (media: { url: string; fileName?: string }) => {
     onChange(media.url);
     setShowBrowser(false);
@@ -316,7 +325,7 @@ function ImagePicker({
         isOpen={showBrowser}
         onClose={() => setShowBrowser(false)}
         onSelect={handleSelectImage}
-        apiUrl="/api"
+        apiUrl={apiUrl}
         jwt={jwt}
       />
     </div>

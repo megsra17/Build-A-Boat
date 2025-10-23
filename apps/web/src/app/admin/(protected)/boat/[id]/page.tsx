@@ -35,7 +35,7 @@ export default function EditBoatPage() {
         });
         if (catRes.ok) {
           const catData = await catRes.json();
-          setCategories(catData || []);
+          setCategories(catData?.items || []);
         }
       } catch (e) {
         setErr(e instanceof Error ? e.message : String(e));
