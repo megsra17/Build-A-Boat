@@ -114,20 +114,22 @@ export default function BoatTopSection({
     setErr(null);
     try {
       const payload = {
-        modelYear: Number(modelYear),
+        slug: boat.slug,
         name: name.trim(),
-        categoryId: categoryId || null,
-        msrp: msrp ?? null,
+        basePrice: boat.basePrice ?? 0,
+        modelYear: Number(modelYear),
+        features: null, // or array of strings if needed
         primaryImageUrl: primary || null,
         secondaryImageUrl: secondary || null,
         sideImageUrl: side || null,
-        graphicLogoUrl: logo || null,
+        logoImageUrl: logo || null,
       };
       const updated = await BoatsApi.update(boat.id, payload);
       onUpdated?.(updated);
       setEditing(false);
-    } catch (e: any) {
-      setErr(e?.message ?? "Failed to save.");
+    } catch (e: unknown) {
+      const errorMessage = e instanceof Error ? e.message : "Failed to save.";
+      setErr(errorMessage);
     } finally {
       setBusy(false);
     }
