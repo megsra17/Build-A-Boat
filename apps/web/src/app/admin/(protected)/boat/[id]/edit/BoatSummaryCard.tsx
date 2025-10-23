@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Check, X, PencilLine } from "lucide-react";
+import FolderBrowser from "@/app/components/FolderBrowser";
 
 // Adjust to your types
 type Category = { id: string; name: string };
@@ -267,6 +268,14 @@ function ImagePicker({
   onChange: (url: string) => void;
   round?: boolean;
 }) {
+  const [showBrowser, setShowBrowser] = useState(false);
+  const jwt = typeof window !== 'undefined' ? (localStorage.getItem("jwt") || sessionStorage.getItem("jwt")) : null;
+
+  const handleSelectImage = (media: { url: string; fileName?: string }) => {
+    onChange(media.url);
+    setShowBrowser(false);
+  };
+
   return (
     <div>
       <div className="text-white/70 text-sm mb-2">{label}</div>
@@ -291,12 +300,7 @@ function ImagePicker({
         ) : (
           <button
             type="button"
-            onClick={async () => {
-              // TODO: open your media picker/uploader and get a URL
-              // For now, prompt:
-              const url = prompt("Paste image URL");
-              if (url) onChange(url);
-            }}
+            onClick={() => setShowBrowser(true)}
             className="flex flex-col items-center justify-center text-white/50 hover:text-white gap-2"
           >
             <svg width="54" height="54" viewBox="0 0 24 24"><path fill="currentColor" d="M20.79 10H19V7a5 5 0 0 0-10 0v3H6.21A3.21 3.21 0 0 0 3 13.21v2.58A3.21 3.21 0 0 0 6.21 19h14.58A3.21 3.21 0 0 0 24 15.79v-2.58A3.21 3.21 0 0 0 20.79 10M11 7a3 3 0 0 1 6 0v3h-6Zm10 8.79A1.21 1.21 0 0 1 19.79 17H6.21A1.21 1.21 0 0 1 5 15.79v-2.58A1.21 1.21 0 0 1 6.21 12H19.8a1.21 1.21 0 0 1 1.2 1.21Z"/></svg>
@@ -304,6 +308,14 @@ function ImagePicker({
           </button>
         )}
       </div>
+
+      <FolderBrowser
+        isOpen={showBrowser}
+        onClose={() => setShowBrowser(false)}
+        onSelect={handleSelectImage}
+        apiUrl="/api"
+        jwt={jwt}
+      />
     </div>
   );
 }

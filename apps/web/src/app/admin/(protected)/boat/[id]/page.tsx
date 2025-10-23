@@ -11,12 +11,23 @@ export default function EditBoatPage() {
   const [busy, setBusy] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [boat, setBoat] = useState<(Boat & { categoryId?: string | null }) | null>(null);
+  const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([]);
 
   useEffect(() => {
     (async () => {
       try {
         const res = await BoatsApi.getById(id);
         setBoat(res);
+        
+        // Fetch categories
+        const jwt = localStorage.getItem("jwt") || sessionStorage.getItem("jwt");
+        const catRes = await fetch(`/api/admin/category`, {
+          headers: jwt ? { Authorization: `Bearer ${jwt}` } : {},
+        });
+        if (catRes.ok) {
+          const catData = await catRes.json();
+          setCategories(catData || []);
+        }
       } catch (e) {
         setErr(e instanceof Error ? e.message : String(e));
       } finally {
@@ -33,7 +44,7 @@ export default function EditBoatPage() {
     <div className="space-y-6">
       <BoatSummaryCard
         boat={boat}
-        categories={[]}
+        categories={categories}
         onUpdated={(next) => setBoat(next)}
       />
       {/* The rest of the editor (configurations, etc.) goes below */}
