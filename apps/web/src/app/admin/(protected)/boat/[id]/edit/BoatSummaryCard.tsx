@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState, useEffect } from "react";
 import { Check, X, PencilLine } from "lucide-react";
 import FolderBrowser from "@/app/components/FolderBrowser";
 
@@ -53,14 +53,8 @@ const BoatsApi = {
   },
 };
 
-function money(n?: number | null) {
-  if (n == null) return "—";
-  return n.toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 0 });
-}
-
 export default function BoatTopSection({
   boat,
-  categories,
   onUpdated, // callback(boat) when saved
 }: {
   boat: Boat;
@@ -74,34 +68,118 @@ export default function BoatTopSection({
   // local form state for edit mode
   const [modelYear, setModelYear] = useState(boat.modelYear ?? new Date().getFullYear());
   const [name, setName] = useState(boat.name ?? "");
-  const [categoryId, setCategoryId] = useState<string | "">(boat.categoryId ?? "");
-  const [msrp, setMsrp] = useState(boat.msrp ?? undefined);
+  const [boatCategories, setBoatCategories] = useState<Category[]>([]);
+  const [newCategoryName, setNewCategoryName] = useState("");
 
   const [primary, setPrimary] = useState(boat.primaryImageUrl ?? "");
   const [secondary, setSecondary] = useState(boat.secondaryImageUrl ?? "");
   const [side, setSide] = useState(boat.sideImageUrl ?? "");
   const [logo, setLogo] = useState(boat.graphicLogoUrl ?? "");
 
-  const catLabel = useMemo(
-    () => {
-      const catsArray = Array.isArray(categories) ? categories : [];
-      return catsArray.find(c => c.id === (boat.categoryId ?? ""))?.name ?? boat.categoryName ?? "—";
-    },
-    [categories, boat.categoryId, boat.categoryName]
-  );
+  useEffect(() => {
+    // Fetch boat's categories when component mounts
+    (async () => {
+      try {
+        const jwt = typeof window !== 'undefined' ? (localStorage.getItem("jwt") || sessionStorage.getItem("jwt")) : null;
+        const apiUrl = getApiBase();
+        const res = await fetch(`${apiUrl}/admin/boat/${boat.id}/category`, {
+          headers: jwt ? { Authorization: `Bearer ${jwt}` } : {},
+        });
+        if (res.ok) {
+          const cats = await res.json();
+          setBoatCategories(Array.isArray(cats) ? cats : cats?.items || []);
+        }
+      } catch (e) {
+        console.error("Failed to fetch categories:", e);
+      }
+    })();
+  }, [boat.id]);
 
   function enterEdit() {
     // seed form from current boat (safe if user cancelled previously)
     setModelYear(boat.modelYear ?? new Date().getFullYear());
     setName(boat.name ?? "");
-    setCategoryId(boat.categoryId ?? "");
-    setMsrp(boat.msrp ?? undefined);
     setPrimary(boat.primaryImageUrl ?? "");
     setSecondary(boat.secondaryImageUrl ?? "");
     setSide(boat.sideImageUrl ?? "");
     setLogo(boat.graphicLogoUrl ?? "");
+    setNewCategoryName("");
     setErr(null);
     setEditing(true);
+  }
+
+  async function addCategory() {
+    if (!newCategoryName.trim()) return;
+    
+    try {
+      const jwt = typeof window !== 'undefined' ? (localStorage.getItem("jwt") || sessionStorage.getItem("jwt")) : null;
+      const apiUrl = getApiBase();
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (jwt) {
+        headers["Authorization"] = `Bearer ${jwt}`;
+      }
+      
+      const payload = {
+        boatId: boat.id,
+        name: newCategoryName.trim(),
+        sortOrder: boatCategories.length,
+        isRequired: false,
+      };
+      
+      console.log("Adding category with payload:", payload);
+      
+      const res = await fetch(`${apiUrl}/admin/category`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(payload),
+      });
+      
+      if (res.ok) {
+        const newCat = await res.json();
+        console.log("Category added successfully:", newCat);
+        setBoatCategories([...boatCategories, newCat]);
+        setNewCategoryName("");
+      } else {
+        const errorText = await res.text();
+        console.error("Failed to add category:", errorText);
+        throw new Error(errorText || `HTTP ${res.status}`);
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Failed to add category";
+      console.error(msg);
+      setErr(msg);
+    }
+  }
+
+  async function deleteCategory(categoryId: string) {
+    try {
+      const jwt = typeof window !== 'undefined' ? (localStorage.getItem("jwt") || sessionStorage.getItem("jwt")) : null;
+      const apiUrl = getApiBase();
+      const headers: Record<string, string> = {};
+      if (jwt) {
+        headers["Authorization"] = `Bearer ${jwt}`;
+      }
+      
+      console.log("Deleting category:", categoryId);
+      
+      const res = await fetch(`${apiUrl}/admin/category/${categoryId}`, {
+        method: "DELETE",
+        headers,
+      });
+      
+      if (res.ok) {
+        console.log("Category deleted successfully");
+        setBoatCategories(boatCategories.filter(c => c.id !== categoryId));
+      } else {
+        const errorText = await res.text();
+        console.error("Failed to delete category:", errorText);
+        throw new Error(errorText || `HTTP ${res.status}`);
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Failed to delete category";
+      console.error(msg);
+      setErr(msg);
+    }
   }
 
   function cancel() {
@@ -124,11 +202,30 @@ export default function BoatTopSection({
         sideImageUrl: side || null,
         logoImageUrl: logo || null,
       };
+      
+      console.log("Saving boat with payload:", payload);
+      
       const updated = await BoatsApi.update(boat.id, payload);
+      console.log("Boat saved successfully:", updated);
+      
+      // Refetch categories to ensure they're up to date
+      const jwt = typeof window !== 'undefined' ? (localStorage.getItem("jwt") || sessionStorage.getItem("jwt")) : null;
+      const apiUrl = getApiBase();
+      const catRes = await fetch(`${apiUrl}/admin/boat/${boat.id}/category`, {
+        headers: jwt ? { Authorization: `Bearer ${jwt}` } : {},
+      });
+      if (catRes.ok) {
+        const cats = await catRes.json();
+        const catList = Array.isArray(cats) ? cats : cats?.items || [];
+        console.log("Categories refetched:", catList);
+        setBoatCategories(catList);
+      }
+      
       onUpdated?.(updated);
       setEditing(false);
     } catch (e: unknown) {
       const errorMessage = e instanceof Error ? e.message : "Failed to save.";
+      console.error("Save error:", errorMessage);
       setErr(errorMessage);
     } finally {
       setBusy(false);
@@ -168,9 +265,12 @@ export default function BoatTopSection({
           <dl className="grid grid-cols-[160px_1fr] gap-x-6 gap-y-3 text-[15px]">
             <dt className="text-white/50">Model Year:</dt><dd>{boat.modelYear ?? "—"}</dd>
             <dt className="text-white/50">Name:</dt><dd>{boat.name ?? "—"}</dd>
-            <dt className="text-white/50">Category:</dt><dd>{catLabel}</dd>
-            <dt className="text-white/50">MSRP:</dt><dd>{money(boat.msrp)}</dd>
-            {/* Add Start Build Link here if you store it */}
+            <dt className="text-white/50">Categories:</dt>
+            <dd>
+              {Array.isArray(boatCategories) && boatCategories.length > 0
+                ? boatCategories.map((c: Category) => c.name).join(", ")
+                : "—"}
+            </dd>
           </dl>
         </div>
       </section>
@@ -224,32 +324,52 @@ export default function BoatTopSection({
             onChange={e => setName(e.target.value)}
           />
         </Field>
+      </div>
 
-        <Field label="Category">
-          <div className="relative">
-            <select
-              className="w-full bg-transparent border-b border-white/30 focus:border-white/70 outline-none py-1 pr-6"
-              value={categoryId}
-              onChange={e => setCategoryId(e.target.value)}
-            >
-              <option value="">—</option>
-              {Array.isArray(categories) && categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-            <span className="pointer-events-none absolute right-0 top-1.5 text-white/60">▾</span>
+      {/* Category management */}
+      <div className="mt-8 pt-6 border-t border-white/10">
+        <h3 className="text-lg font-medium text-white/90 mb-4">Categories</h3>
+        
+        {/* Display existing categories */}
+        {boatCategories.length > 0 && (
+          <div className="mb-4">
+            <div className="space-y-2">
+              {boatCategories.map((cat: Category) => (
+                <div key={cat.id} className="flex items-center justify-between bg-black/30 rounded px-3 py-2 border border-white/10">
+                  <span className="text-white/80">{cat.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => deleteCategory(cat.id)}
+                    disabled={busy}
+                    className="text-red-400 hover:text-red-300 text-sm px-2 py-1 rounded hover:bg-red-900/20 transition"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
-        </Field>
-
-        <Field label="MSRP">
+        )}
+        
+        {/* Add new category */}
+        <div className="flex gap-2">
           <input
-            type="number"
-            inputMode="numeric"
-            min={0}
-            className="w-full bg-transparent border-b border-white/30 focus:border-white/70 outline-none py-1"
-            value={msrp ?? ""}
-            onChange={e => setMsrp(e.target.value === "" ? undefined : Number(e.target.value))}
-            placeholder="e.g. 125000"
+            type="text"
+            placeholder="New category name..."
+            className="flex-1 bg-transparent border-b border-white/30 focus:border-white/70 outline-none py-1 text-white placeholder-white/40"
+            value={newCategoryName}
+            onChange={e => setNewCategoryName(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && addCategory()}
           />
-        </Field>
+          <button
+            type="button"
+            onClick={addCategory}
+            disabled={busy || !newCategoryName.trim()}
+            className="px-4 py-1 rounded bg-yellow-600/40 text-yellow-300 hover:bg-yellow-600/60 disabled:opacity-50 disabled:cursor-not-allowed text-sm transition"
+          >
+            Add
+          </button>
+        </div>
       </div>
 
       {/* image pickers – only shown in edit mode */}
