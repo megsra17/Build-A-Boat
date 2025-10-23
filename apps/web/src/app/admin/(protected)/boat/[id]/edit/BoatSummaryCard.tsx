@@ -36,9 +36,16 @@ const getApiBase = () => {
 const BoatsApi = {
   update: async (id: string, body: unknown) => {
     const apiUrl = getApiBase();
+    const jwt = typeof window !== 'undefined' ? (localStorage.getItem("jwt") || sessionStorage.getItem("jwt")) : null;
+    
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (jwt) {
+      headers["Authorization"] = `Bearer ${jwt}`;
+    }
+    
     const res = await fetch(`${apiUrl}/admin/boat/${id}`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify(body),
     });
     if (!res.ok) throw new Error(await res.text());
