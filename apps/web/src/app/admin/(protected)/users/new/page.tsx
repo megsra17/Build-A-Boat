@@ -6,6 +6,11 @@ import {Eye, EyeOff, Upload, Check} from "lucide-react";
 import { UsersApi } from "../../../../lib/admin-api";
 import { Roles, Timezones } from "@/app/lib/constants"; 
 
+// Use Railway URL for production, localhost for development
+const API = process.env.NODE_ENV === 'production' 
+  ? "https://build-a-boat-production.up.railway.app"
+  : "http://localhost:5001";
+
 export default function NewUserPage() {
     const r = useRouter();
     const fileRef = useRef<HTMLInputElement>(null);
@@ -58,12 +63,12 @@ export default function NewUserPage() {
             const formData = new FormData();
             formData.append('file', file);
 
-            const token = localStorage.getItem('token');
+            const token = typeof window !== "undefined" ? localStorage.getItem("token") || sessionStorage.getItem("token") : null;
             if (!token) {
                 throw new Error('No authentication token found');
             }
 
-            const response = await fetch('/admin/media/upload/avatars', {
+            const response = await fetch(`${API}/admin/media/upload/avatars`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`
