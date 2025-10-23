@@ -55,6 +55,7 @@ const BoatsApi = {
 
 export default function BoatTopSection({
   boat,
+  categories,
   onUpdated, // callback(boat) when saved
 }: {
   boat: Boat;
@@ -68,8 +69,9 @@ export default function BoatTopSection({
   // local form state for edit mode
   const [modelYear, setModelYear] = useState(boat.modelYear ?? new Date().getFullYear());
   const [name, setName] = useState(boat.name ?? "");
+  const [basePrice, setBasePrice] = useState(boat.basePrice ?? 0);
   const [boatCategories, setBoatCategories] = useState<Category[]>([]);
-  const [newCategoryName, setNewCategoryName] = useState("");
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>("");
 
   const [primary, setPrimary] = useState(boat.primaryImageUrl ?? "");
   const [secondary, setSecondary] = useState(boat.secondaryImageUrl ?? "");
@@ -99,17 +101,24 @@ export default function BoatTopSection({
     // seed form from current boat (safe if user cancelled previously)
     setModelYear(boat.modelYear ?? new Date().getFullYear());
     setName(boat.name ?? "");
+    setBasePrice(boat.basePrice ?? 0);
     setPrimary(boat.primaryImageUrl ?? "");
     setSecondary(boat.secondaryImageUrl ?? "");
     setSide(boat.sideImageUrl ?? "");
     setLogo(boat.graphicLogoUrl ?? "");
-    setNewCategoryName("");
+    setSelectedCategoryId("");
     setErr(null);
     setEditing(true);
   }
 
-  async function addCategory() {
-    if (!newCategoryName.trim()) return;
+  async function assignCategory() {
+    if (!selectedCategoryId) return;
+    
+    // Check if already assigned
+    if (boatCategories.some(c => c.id === selectedCategoryId)) {
+      setErr("Category already assigned to this boat");
+      return;
+    }
     
     try {
       const jwt = typeof window !== 'undefined' ? (localStorage.getItem("jwt") || sessionStorage.getItem("jwt")) : null;
@@ -119,14 +128,21 @@ export default function BoatTopSection({
         headers["Authorization"] = `Bearer ${jwt}`;
       }
       
+      // Find the category details from the available categories
+      const categoryToAssign = categories.find(c => c.id === selectedCategoryId);
+      if (!categoryToAssign) {
+        throw new Error("Category not found");
+      }
+      
+      // Create a new category record for this boat by updating the existing category
       const payload = {
         boatId: boat.id,
-        name: newCategoryName.trim(),
+        name: categoryToAssign.name,
         sortOrder: boatCategories.length,
         isRequired: false,
       };
       
-      console.log("Adding category with payload:", payload);
+      console.log("Assigning category with payload:", payload);
       
       const res = await fetch(`${apiUrl}/admin/category`, {
         method: "POST",
@@ -136,16 +152,16 @@ export default function BoatTopSection({
       
       if (res.ok) {
         const newCat = await res.json();
-        console.log("Category added successfully:", newCat);
+        console.log("Category assigned successfully:", newCat);
         setBoatCategories([...boatCategories, newCat]);
-        setNewCategoryName("");
+        setSelectedCategoryId("");
       } else {
         const errorText = await res.text();
-        console.error("Failed to add category:", errorText);
+        console.error("Failed to assign category:", errorText);
         throw new Error(errorText || `HTTP ${res.status}`);
       }
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Failed to add category";
+      const msg = e instanceof Error ? e.message : "Failed to assign category";
       console.error(msg);
       setErr(msg);
     }
@@ -194,7 +210,7 @@ export default function BoatTopSection({
       const payload = {
         slug: boat.slug,
         name: name.trim(),
-        basePrice: boat.basePrice ?? 0,
+        basePrice: Number(basePrice) || 0,
         modelYear: Number(modelYear),
         features: null, // or array of strings if needed
         primaryImageUrl: primary || null,
@@ -265,6 +281,7 @@ export default function BoatTopSection({
           <dl className="grid grid-cols-[160px_1fr] gap-x-6 gap-y-3 text-[15px]">
             <dt className="text-white/50">Model Year:</dt><dd>{boat.modelYear ?? "—"}</dd>
             <dt className="text-white/50">Name:</dt><dd>{boat.name ?? "—"}</dd>
+            <dt className="text-white/50">MSRP:</dt><dd>${boat.basePrice?.toLocaleString() ?? "—"}</dd>
             <dt className="text-white/50">Categories:</dt>
             <dd>
               {Array.isArray(boatCategories) && boatCategories.length > 0
@@ -324,6 +341,15 @@ export default function BoatTopSection({
             onChange={e => setName(e.target.value)}
           />
         </Field>
+
+        <Field label="MSRP / Base Price">
+          <input
+            type="number"
+            className="w-full bg-transparent border-b border-white/30 focus:border-white/70 outline-none py-1"
+            value={basePrice}
+            onChange={e => setBasePrice(Number(e.target.value))}
+          />
+        </Field>
       </div>
 
       {/* Category management */}
@@ -351,20 +377,24 @@ export default function BoatTopSection({
           </div>
         )}
         
-        {/* Add new category */}
+        {/* Assign existing category */}
         <div className="flex gap-2">
-          <input
-            type="text"
-            placeholder="New category name..."
-            className="flex-1 bg-transparent border-b border-white/30 focus:border-white/70 outline-none py-1 text-white placeholder-white/40"
-            value={newCategoryName}
-            onChange={e => setNewCategoryName(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && addCategory()}
-          />
+          <select
+            value={selectedCategoryId}
+            onChange={e => setSelectedCategoryId(e.target.value)}
+            className="flex-1 bg-black/50 border-b border-white/30 focus:border-white/70 outline-none py-1 text-white"
+          >
+            <option value="">Select a category to add...</option>
+            {categories.map(cat => (
+              <option key={cat.id} value={cat.id} disabled={boatCategories.some(bc => bc.id === cat.id)}>
+                {cat.name} {boatCategories.some(bc => bc.id === cat.id) ? "(already assigned)" : ""}
+              </option>
+            ))}
+          </select>
           <button
             type="button"
-            onClick={addCategory}
-            disabled={busy || !newCategoryName.trim()}
+            onClick={assignCategory}
+            disabled={busy || !selectedCategoryId}
             className="px-4 py-1 rounded bg-yellow-600/40 text-yellow-300 hover:bg-yellow-600/60 disabled:opacity-50 disabled:cursor-not-allowed text-sm transition"
           >
             Add
