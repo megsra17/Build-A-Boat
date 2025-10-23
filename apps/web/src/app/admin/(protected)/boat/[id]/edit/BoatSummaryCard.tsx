@@ -24,11 +24,20 @@ type Boat = {
   graphicLogoUrl?: string | null;
 };
 
+// Get API base URL
+const getApiBase = () => {
+  if (typeof window !== 'undefined' && process.env.NODE_ENV === 'production') {
+    return process.env.NEXT_PUBLIC_API_BASE || 'https://build-a-boat-production.up.railway.app';
+  }
+  return process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5199";
+};
+
 // Stub; replace with your lib
 const BoatsApi = {
-  update: async (id: string, body: any) => {
-    const res = await fetch(`/api/admin/boats/${id}`, {
-      method: "PUT",
+  update: async (id: string, body: unknown) => {
+    const apiUrl = getApiBase();
+    const res = await fetch(`${apiUrl}/admin/boat/${id}`, {
+      method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
