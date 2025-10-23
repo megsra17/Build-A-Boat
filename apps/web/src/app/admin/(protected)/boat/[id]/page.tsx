@@ -4,6 +4,15 @@ import { useParams } from "next/navigation";
 import { BoatsApi, type Boat } from "@/app/lib/admin-api";
 import BoatSummaryCard from "./edit/BoatSummaryCard";
 
+const getApiBase = () => {
+  if (process.env.NODE_ENV === 'production') {
+    return process.env.NEXT_PUBLIC_API_BASE || 'https://build-a-boat-production.up.railway.app';
+  }
+  return process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5199";
+};
+
+const API = getApiBase();
+
 export default function EditBoatPage() {
   const params = useParams<{ id: string }>();
   const id = params?.id as string;
@@ -21,7 +30,7 @@ export default function EditBoatPage() {
         
         // Fetch categories
         const jwt = localStorage.getItem("jwt") || sessionStorage.getItem("jwt");
-        const catRes = await fetch(`/api/admin/category`, {
+        const catRes = await fetch(`${API}/admin/category`, {
           headers: jwt ? { Authorization: `Bearer ${jwt}` } : {},
         });
         if (catRes.ok) {
