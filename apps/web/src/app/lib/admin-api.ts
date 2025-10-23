@@ -25,7 +25,7 @@ import { string } from "zod";
 import { authFetch } from "../lib/auth-client";
 import { features } from "process";
 
-export type Boat = { id: string; slug: string; name: string; basePrice: number; modelYear?: number | null; isActive: boolean; heroImageUrl?: string|null; };
+export type Boat = { id: string; slug: string; name: string; basePrice: number; modelYear?: number | null; isActive: boolean; heroImageUrl?: string|null; primaryImageUrl?: string|null; secondaryImageUrl?: string|null; sideImageUrl?: string|null; logoImageUrl?: string|null; };
 export type Category = { id: string; boatId: string; name: string; sortOrder: number; isRequired: boolean; };
 export type OptionGroup = { id: string; categoryId: string; name: string; selectionType: string; minSelect: number; maxSelect: number; sortOrder: number; };
 export type OptionItem = { id: string; optionGroupId: string; sku?: string|null; label: string; description?: string|null; priceDelta: number; imageUrl?: string|null; isDefault: boolean; isActive: boolean; sortOrder: number; };

@@ -119,8 +119,8 @@ export default function BoatsPage() {
                 <td className="px-4 py-3">
                   <Link href={`/admin/boat/${b.id}`} className="flex items-center gap-2 block">
                     <div className="size-8 rounded bg-black/50 border border-white/10 overflow-hidden">
-                      {b.heroImageUrl ? (
-                        <Image src={b.heroImageUrl} alt="" width={32} height={32} className="w-8 h-8 object-cover" />
+                      {b.primaryImageUrl ? (
+                        <Image src={b.primaryImageUrl} alt="" width={32} height={32} className="w-8 h-8 object-cover" />
                       ) : (
                         <div className="w-8 h-8 flex items-center justify-center text-white/40">🚤</div>
                       )}
