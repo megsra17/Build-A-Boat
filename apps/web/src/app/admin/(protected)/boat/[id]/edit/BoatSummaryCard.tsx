@@ -67,7 +67,10 @@ export default function BoatTopSection({
   const [logo, setLogo] = useState(boat.graphicLogoUrl ?? "");
 
   const catLabel = useMemo(
-    () => categories.find(c => c.id === (boat.categoryId ?? ""))?.name ?? boat.categoryName ?? "—",
+    () => {
+      const catsArray = Array.isArray(categories) ? categories : [];
+      return catsArray.find(c => c.id === (boat.categoryId ?? ""))?.name ?? boat.categoryName ?? "—";
+    },
     [categories, boat.categoryId, boat.categoryName]
   );
 
@@ -212,7 +215,7 @@ export default function BoatTopSection({
               onChange={e => setCategoryId(e.target.value)}
             >
               <option value="">—</option>
-              {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              {Array.isArray(categories) && categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
             <span className="pointer-events-none absolute right-0 top-1.5 text-white/60">▾</span>
           </div>
