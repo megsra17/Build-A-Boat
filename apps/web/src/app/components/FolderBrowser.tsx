@@ -154,8 +154,6 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
         body: formData,
       });
 
-      console.log('Upload response status:', res.status, 'Upload path:', uploadPath);
-
       if (!res.ok) {
         const errorText = await res.text();
         console.error('Upload error:', errorText, 'Status:', res.status);
@@ -163,7 +161,6 @@ export default function FolderBrowser({ isOpen, onClose, onSelect, apiUrl, jwt }
       }
 
       const uploadedMedia = await res.json();
-      console.log('Upload successful:', uploadedMedia);
       
       // Add to current media list and auto-select
       setMedia(prev => [uploadedMedia, ...prev]);

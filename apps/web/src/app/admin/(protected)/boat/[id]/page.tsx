@@ -36,11 +36,8 @@ export default function BoatEditPage() {
       setError(null);
       
       try {
-        console.log('Fetching boat with ID:', boatId);
-        
         // Use the new getById function to fetch the boat
         const boatData = await BoatsApi.getById(boatId);
-        console.log('Boat data received:', boatData);
         
         if (mounted) {
           // Convert the base boat to our extended type
