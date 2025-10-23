@@ -1,8 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { BoatsApi } from "@/app/lib/admin-api";
-import BoatSummaryCard, { type BoatSummary } from "./edit/BoatSummaryCard";
+import { BoatsApi, type Boat } from "@/app/lib/admin-api";
+import BoatSummaryCard from "./edit/BoatSummaryCard";
 
 export default function EditBoatPage() {
   const params = useParams<{ id: string }>();
@@ -10,7 +10,7 @@ export default function EditBoatPage() {
 
   const [busy, setBusy] = useState(true);
   const [err, setErr] = useState<string | null>(null);
-  const [boat, setBoat] = useState<BoatSummary | null>(null);
+  const [boat, setBoat] = useState<(Boat & { categoryId?: string | null }) | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -32,8 +32,8 @@ export default function EditBoatPage() {
   return (
     <div className="space-y-6">
       <BoatSummaryCard
-        boatId={id}
-        initial={boat}
+        boat={boat}
+        categories={[]}
         onUpdated={(next) => setBoat(next)}
       />
       {/* The rest of the editor (configurations, etc.) goes below */}

@@ -7,16 +7,20 @@ import { Check, X, PencilLine } from "lucide-react";
 type Category = { id: string; name: string };
 type Boat = {
   id: string;
-  modelYear: number;
+  slug: string;
+  modelYear?: number | null;
   name: string;
-  categoryId: string | null;
+  basePrice: number;
+  isActive: boolean;
+  categoryId?: string | null;
   categoryName?: string;
   msrp?: number | null;
-  heroImageUrl?: string;        
-  primaryImageUrl?: string;     
-  secondaryImageUrl?: string;
-  sideImageUrl?: string;
-  graphicLogoUrl?: string;
+  heroImageUrl?: string | null;        
+  primaryImageUrl?: string | null;     
+  secondaryImageUrl?: string | null;
+  sideImageUrl?: string | null;
+  logoImageUrl?: string | null;
+  graphicLogoUrl?: string | null;
 };
 
 // Stub; replace with your lib
