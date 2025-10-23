@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { BoatsApi, CategoriesApi } from "@/src/app/lib/admin-api";
+import { BoatsApi, CategoriesApi } from "@/app/lib/admin-api";
 import { Check, X, ChevronDown } from "lucide-react";
 
 type Summary = {
