@@ -268,10 +268,10 @@ export default function BoatTopSection({
         </div>
 
         <div className="grid grid-cols-[380px_1fr] gap-8">
-          {/* hero / static image */}
+          {/* Primary image */}
           <div className="rounded-lg bg-black/40 aspect-[16/9] flex items-center justify-center overflow-hidden">
-            {boat.heroImageUrl ? (
-              <img src={boat.heroImageUrl} className="w-full h-full object-contain" alt="" />
+            {boat.primaryImageUrl ? (
+              <img src={boat.primaryImageUrl} className="w-full h-full object-contain" alt="" />
             ) : (
               <div className="text-white/40 text-sm">No image</div>
             )}
