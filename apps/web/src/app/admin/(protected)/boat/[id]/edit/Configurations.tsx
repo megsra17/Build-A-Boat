@@ -311,17 +311,39 @@ export default function Configurations({
     }
   }
 
-  function cloneCategory(groupId: string, catId: string) {
-    updateCfg(c => {
-      const g = c.groups.find(x => x.id === groupId);
+  async function cloneCategory(groupId: string, catId: string) {
+    setBusy(true);
+    setErr(null);
+    try {
+      const g = cfg.groups.find(x => x.id === groupId);
       if (!g) return;
       const i = g.categories.findIndex(x => x.id === catId);
       if (i < 0) return;
-      const copy = structuredClone(g.categories[i]);
-      copy.id = uid();
-      copy.name = copy.name + " (Copy)";
-      g.categories.splice(i + 1, 0, copy);
-    });
+      
+      const originalCat = g.categories[i];
+      const newCatName = originalCat.name + " (Copy)";
+      const sortOrder = i + 1;
+      
+      // Create the copy in the database
+      const newCat = await Api.createCategory(groupId, newCatName, sortOrder, boatId);
+      
+      // Update local state with the new category from server
+      updateCfg(c => {
+        const g = c.groups.find(x => x.id === groupId);
+        if (g) {
+          g.categories.splice(i + 1, 0, { 
+            id: newCat.id, 
+            name: newCat.name, 
+            options: [] 
+          });
+        }
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Failed to clone category";
+      setErr(msg);
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function renameCategory(groupId: string, catId: string, name: string) {
@@ -462,8 +484,7 @@ export default function Configurations({
                   </button>
                   <div className="flex items-center gap-2">
                     <button onClick={() => {
-                      const name = prompt("Rename group", g.name);
-                      if (name) renameGroup(g.id, name);
+                      openRenameDialog("group", g.id, g.name);
                     }} title="Rename" className="icon-btn">
                       <Pencil className="size-4"/>
                     </button>
