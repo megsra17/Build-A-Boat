@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Check, X, PencilLine, Sailboat, SailboatIcon } from "lucide-react";
+import { Check, X, PencilLine} from "lucide-react";
 import FolderBrowser from "@/app/components/FolderBrowser";
 
 // Adjust to your types
@@ -246,7 +246,6 @@ export default function BoatTopSection({
         {/* header row */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2 text-white/90">
-            <Sailboat className="size-4 absolute left-2 top-1/2 -translate-y-1/2 text-white/50"/>
             <h2 className="text-xl font-semibold">{boat.modelYear} {boat.name}</h2>
           </div>
           <button

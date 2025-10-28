@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { BoatsApi, type Boat } from "@/app/lib/admin-api";
 import BoatSummaryCard from "./edit/BoatSummaryCard";
+import Configurations from "./edit/Configurations";
 
 const getApiBase = () => {
   if (process.env.NODE_ENV === 'production') {
@@ -19,7 +20,7 @@ export default function EditBoatPage() {
 
   const [busy, setBusy] = useState(true);
   const [err, setErr] = useState<string | null>(null);
-  const [boat, setBoat] = useState<(Boat & { categoryId?: string | null }) | null>(null);
+  const [boat, setBoat] = useState<(Boat & { categoryId?: string | null; config?: { groups: any[] } }) | null>(null);
   const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([]);
 
   useEffect(() => {
@@ -56,7 +57,15 @@ export default function EditBoatPage() {
         categories={categories}
         onUpdated={(next) => setBoat(next)}
       />
-      {/* The rest of the editor (configurations, etc.) goes below */}
+       <Configurations
+        boatId={boat.id}
+        initial={{
+            boatId: boat.id,
+            groups: boat.config?.groups ?? [
+            { id: crypto.randomUUID(), name: "Exterior", categories: [] },
+            ],
+        }}
+        />
     </div>
   );
 }
