@@ -38,7 +38,7 @@ const Api = {
     return res.json();
   },
 
-  updateGroup: async (groupId: string, name: string) => {
+  updateGroup: async (groupId: string, name: string, sortOrder?: number) => {
     const jwt = typeof window !== 'undefined' ? (localStorage.getItem("jwt") || sessionStorage.getItem("jwt")) : null;
     const apiUrl = getApiBase();
     const headers: Record<string, string> = { "Content-Type": "application/json" };
@@ -46,10 +46,15 @@ const Api = {
       headers["Authorization"] = `Bearer ${jwt}`;
     }
     
+    const body: Record<string, any> = { name };
+    if (sortOrder !== undefined) {
+      body.sortOrder = sortOrder;
+    }
+    
     const res = await fetch(`${apiUrl}/admin/groups/${groupId}`, {
       method: "PATCH",
       headers,
-      body: JSON.stringify({ name }),
+      body: JSON.stringify(body),
     });
     if (!res.ok) throw new Error(await res.text());
     return res.json();
@@ -231,24 +236,32 @@ export default function Configurations({
       return;
     }
 
-    // Reorder groups
+    // Reorder groups locally
+    const newGroups = [...cfg.groups];
+    const [removed] = newGroups.splice(draggedIndex, 1);
+    newGroups.splice(targetIndex, 0, removed);
+
     updateCfg(c => {
-      const [removed] = c.groups.splice(draggedIndex, 1);
-      c.groups.splice(targetIndex, 0, removed);
+      c.groups = newGroups;
     });
 
-    // Update sort order for all groups
+    // Update sort order for affected groups in database
     setBusy(true);
     try {
-      for (let i = 0; i < cfg.groups.length; i++) {
-        const group = cfg.groups[i];
+      for (let i = 0; i < newGroups.length; i++) {
+        const group = newGroups[i];
+        // Only update the dragged group and the target group since order changed
         if (group.id === draggedGroupId || group.id === targetId) {
-          await Api.updateGroup(group.id, group.name);
+          await Api.updateGroup(group.id, group.name, i);
         }
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Failed to reorder groups";
       setErr(msg);
+      // Revert to previous state on error
+      updateCfg(c => {
+        c.groups = cfg.groups;
+      });
     } finally {
       setBusy(false);
       setDraggedGroupId(null);
