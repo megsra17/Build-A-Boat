@@ -22,6 +22,7 @@ export default function EditBoatPage() {
   const [err, setErr] = useState<string | null>(null);
   const [boat, setBoat] = useState<(Boat & { categoryId?: string | null; config?: { groups: any[] } }) | null>(null);
   const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([]);
+  const [groups, setGroups] = useState<any[]>([]);
 
   useEffect(() => {
     (async () => {
@@ -37,6 +38,15 @@ export default function EditBoatPage() {
         if (catRes.ok) {
           const catData = await catRes.json();
           setCategories(catData?.items || []);
+        }
+
+        // Fetch groups for boat
+        const groupsRes = await fetch(`${API}/admin/boat/${id}/groups`, {
+          headers: jwt ? { Authorization: `Bearer ${jwt}` } : {},
+        });
+        if (groupsRes.ok) {
+          const groupsData = await groupsRes.json();
+          setGroups(groupsData || []);
         }
       } catch (e) {
         setErr(e instanceof Error ? e.message : String(e));
@@ -61,8 +71,12 @@ export default function EditBoatPage() {
         boatId={boat.id}
         initial={{
             boatId: boat.id,
-            groups: boat.config?.groups ?? [
-            { id: crypto.randomUUID(), name: "Exterior", categories: [] },
+            groups: groups.length > 0 ? groups.map((g: any) => ({
+              id: g.id,
+              name: g.name,
+              categories: g.categories || []
+            })) : [
+              { id: crypto.randomUUID(), name: "Exterior", categories: [] },
             ],
         }}
         />

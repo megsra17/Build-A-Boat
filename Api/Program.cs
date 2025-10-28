@@ -1416,6 +1416,43 @@ admin.MapPost("/media/folder/delete", async (HttpRequest req, AppDb db, IS3Servi
 });
 
 // Categories
+// Groups endpoints
+admin.MapGet("/boat/{boatId:guid}/groups", async (Guid boatId, AppDb db) =>
+    Results.Ok(await db.Groups
+        .Where(g => g.BoatId == boatId)
+        .Include(g => g.Categories)
+            .ThenInclude(c => c.OptionsGroups)
+                .ThenInclude(og => og.Options)
+        .OrderBy(g => g.SortOrder)
+        .ToListAsync()));
+
+admin.MapPost("/groups", async (GroupUpsert dto, AppDb db) =>
+{
+    var g = new Group { Id = Guid.NewGuid(), BoatId = dto.BoatId, Name = dto.Name, SortOrder = dto.SortOrder };
+    db.Groups.Add(g);
+    await db.SaveChangesAsync();
+    return Results.Created($"/admin/groups/{g.Id}", g);
+});
+
+admin.MapPatch("/groups/{id:guid}", async (Guid id, GroupUpsert dto, AppDb db) =>
+{
+    var g = await db.Groups.FindAsync(id);
+    if (g is null) return Results.NotFound();
+    g.Name = dto.Name;
+    g.SortOrder = dto.SortOrder;
+    await db.SaveChangesAsync();
+    return Results.Ok(g);
+});
+
+admin.MapDelete("/groups/{id:guid}", async (Guid id, AppDb db) =>
+{
+    var g = await db.Groups.FindAsync(id);
+    if (g is null) return Results.NotFound();
+    db.Groups.Remove(g);
+    await db.SaveChangesAsync();
+    return Results.NoContent();
+});
+
 admin.MapGet("/category", async (AppDb db) =>
     Results.Ok(new { items = await db.Categories.OrderBy(c => c.Name).ToListAsync() }));
 
@@ -1425,7 +1462,7 @@ admin.MapGet("/boat/{boatId:guid}/category", async (Guid boatId, AppDb db) =>
 // Create category
 admin.MapPost("/category", async (CategoryUpsert dto, AppDb db) =>
 {
-    var c = new Category { Id = Guid.NewGuid(), BoatId = dto.BoatId, Name = dto.Name, SortOrder = dto.SortOrder, IsRequired = dto.IsRequired };
+    var c = new Category { Id = Guid.NewGuid(), GroupId = dto.GroupId, BoatId = dto.BoatId, Name = dto.Name, SortOrder = dto.SortOrder, IsRequired = dto.IsRequired };
     db.Categories.Add(c);
     await db.SaveChangesAsync();
     return Results.Created($"/admin/category/{c.Id}", c);
@@ -1436,6 +1473,7 @@ admin.MapPatch("/category/{id:guid}", async (Guid id, CategoryUpsert dto, AppDb 
 {
     var c = await db.Categories.FindAsync(id);
     if (c is null) return Results.NotFound();
+    c.GroupId = dto.GroupId;
     c.BoatId = dto.BoatId;
     c.Name = dto.Name;
     c.SortOrder = dto.SortOrder;

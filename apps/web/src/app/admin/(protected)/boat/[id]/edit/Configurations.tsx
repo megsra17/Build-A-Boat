@@ -8,9 +8,121 @@ type Group = { id: string; name: string; collapsed?: boolean; categories: Catego
 
 type BoatConfig = { boatId: string; groups: Group[] };
 
-// Replace these with real API calls
+// Get API base URL
+const getApiBase = () => {
+  if (typeof window !== 'undefined' && process.env.NODE_ENV === 'production') {
+    return process.env.NEXT_PUBLIC_API_BASE || 'https://build-a-boat-production.up.railway.app';
+  }
+  return process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5199";
+};
+
 const Api = {
-  save: async (boatId: string, cfg: BoatConfig) => cfg, // stub
+  createGroup: async (boatId: string, name: string, sortOrder: number) => {
+    const jwt = typeof window !== 'undefined' ? (localStorage.getItem("jwt") || sessionStorage.getItem("jwt")) : null;
+    const apiUrl = getApiBase();
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (jwt) {
+      headers["Authorization"] = `Bearer ${jwt}`;
+    }
+    
+    const res = await fetch(`${apiUrl}/admin/groups`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        boatId,
+        name,
+        sortOrder,
+      }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  },
+
+  updateGroup: async (groupId: string, name: string) => {
+    const jwt = typeof window !== 'undefined' ? (localStorage.getItem("jwt") || sessionStorage.getItem("jwt")) : null;
+    const apiUrl = getApiBase();
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (jwt) {
+      headers["Authorization"] = `Bearer ${jwt}`;
+    }
+    
+    const res = await fetch(`${apiUrl}/admin/groups/${groupId}`, {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({ name }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  },
+
+  deleteGroup: async (groupId: string) => {
+    const jwt = typeof window !== 'undefined' ? (localStorage.getItem("jwt") || sessionStorage.getItem("jwt")) : null;
+    const apiUrl = getApiBase();
+    const headers: Record<string, string> = {};
+    if (jwt) {
+      headers["Authorization"] = `Bearer ${jwt}`;
+    }
+    
+    const res = await fetch(`${apiUrl}/admin/groups/${groupId}`, {
+      method: "DELETE",
+      headers,
+    });
+    if (!res.ok) throw new Error(await res.text());
+  },
+
+  createCategory: async (groupId: string, name: string, sortOrder: number) => {
+    const jwt = typeof window !== 'undefined' ? (localStorage.getItem("jwt") || sessionStorage.getItem("jwt")) : null;
+    const apiUrl = getApiBase();
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (jwt) {
+      headers["Authorization"] = `Bearer ${jwt}`;
+    }
+    
+    const res = await fetch(`${apiUrl}/admin/category`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        groupId,
+        name,
+        sortOrder,
+        isRequired: false,
+      }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  },
+
+  updateCategory: async (categoryId: string, name: string) => {
+    const jwt = typeof window !== 'undefined' ? (localStorage.getItem("jwt") || sessionStorage.getItem("jwt")) : null;
+    const apiUrl = getApiBase();
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (jwt) {
+      headers["Authorization"] = `Bearer ${jwt}`;
+    }
+    
+    const res = await fetch(`${apiUrl}/admin/category/${categoryId}`, {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({ name }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  },
+
+  deleteCategory: async (categoryId: string) => {
+    const jwt = typeof window !== 'undefined' ? (localStorage.getItem("jwt") || sessionStorage.getItem("jwt")) : null;
+    const apiUrl = getApiBase();
+    const headers: Record<string, string> = {};
+    if (jwt) {
+      headers["Authorization"] = `Bearer ${jwt}`;
+    }
+    
+    const res = await fetch(`${apiUrl}/admin/category/${categoryId}`, {
+      method: "DELETE",
+      headers,
+    });
+    if (!res.ok) throw new Error(await res.text());
+  },
 };
 
 export default function Configurations({
@@ -25,6 +137,7 @@ export default function Configurations({
     initial.groups[0]?.id ?? ""
   );
   const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
   const selected = useMemo(
     () => cfg.groups.find(g => g.id === selectedGroupId) ?? null,
     [cfg.groups, selectedGroupId]
@@ -41,37 +154,77 @@ export default function Configurations({
     });
   }
 
-  async function persist() {
+  // ---------- group ops
+  async function addGroup() {
     setBusy(true);
-    try { await Api.save(boatId, cfg); } finally { setBusy(false); }
+    setErr(null);
+    try {
+      const newGroup = await Api.createGroup(boatId, "New Group", cfg.groups.length);
+      updateCfg(c => {
+        c.groups.push({ id: newGroup.id, name: newGroup.name, categories: [] });
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Failed to add group";
+      setErr(msg);
+    } finally {
+      setBusy(false);
+    }
   }
 
-  // ---------- group ops
-  function addGroup() {
-    updateCfg(c => {
-      const g: Group = { id: uid(), name: "New Group", categories: [] };
-      c.groups.push(g);
-    });
+  async function renameGroup(id: string, name: string) {
+    setBusy(true);
+    setErr(null);
+    try {
+      await Api.updateGroup(id, name);
+      updateCfg(c => {
+        const g = c.groups.find(x => x.id === id);
+        if (g) g.name = name;
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Failed to rename group";
+      setErr(msg);
+    } finally {
+      setBusy(false);
+    }
   }
-  function renameGroup(id: string, name: string) {
-    updateCfg(c => { const g = c.groups.find(x => x.id === id); if (g) g.name = name; });
-  }
-  function removeGroup(id: string) {
-    updateCfg(c => { c.groups = c.groups.filter(x => x.id !== id); });
-    if (selectedGroupId === id) setSelectedGroupId(cfg.groups[0]?.id ?? "");
-  }
-  function toggleGroup(id: string) {
-    updateCfg(c => { const g = c.groups.find(x => x.id === id); if (g) g.collapsed = !g.collapsed; });
+
+  async function removeGroup(id: string) {
+    setBusy(true);
+    setErr(null);
+    try {
+      await Api.deleteGroup(id);
+      updateCfg(c => { c.groups = c.groups.filter(x => x.id !== id); });
+      if (selectedGroupId === id) setSelectedGroupId(cfg.groups[0]?.id ?? "");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Failed to delete group";
+      setErr(msg);
+    } finally {
+      setBusy(false);
+    }
   }
 
   // ---------- category ops
-  function addCategory(groupId: string) {
-    updateCfg(c => {
-      const g = c.groups.find(x => x.id === groupId);
-      if (!g) return;
-      g.categories.push({ id: uid(), name: "New Category", options: [] });
-    });
+  async function addCategory(groupId: string) {
+    setBusy(true);
+    setErr(null);
+    try {
+      const selected = cfg.groups.find(g => g.id === groupId);
+      if (!selected) return;
+      const newCat = await Api.createCategory(groupId, "New Category", selected.categories.length);
+      updateCfg(c => {
+        const g = c.groups.find(x => x.id === groupId);
+        if (g) {
+          g.categories.push({ id: newCat.id, name: newCat.name, options: [] });
+        }
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Failed to add category";
+      setErr(msg);
+    } finally {
+      setBusy(false);
+    }
   }
+
   function cloneCategory(groupId: string, catId: string) {
     updateCfg(c => {
       const g = c.groups.find(x => x.id === groupId);
@@ -84,18 +237,41 @@ export default function Configurations({
       g.categories.splice(i + 1, 0, copy);
     });
   }
-  function renameCategory(groupId: string, catId: string, name: string) {
-    updateCfg(c => {
-      const cat = c.groups.find(g=>g.id===groupId)?.categories.find(x=>x.id===catId);
-      if (cat) cat.name = name;
-    });
+
+  async function renameCategory(groupId: string, catId: string, name: string) {
+    setBusy(true);
+    setErr(null);
+    try {
+      await Api.updateCategory(catId, name);
+      updateCfg(c => {
+        const cat = c.groups.find(g=>g.id===groupId)?.categories.find(x=>x.id===catId);
+        if (cat) cat.name = name;
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Failed to rename category";
+      setErr(msg);
+    } finally {
+      setBusy(false);
+    }
   }
-  function removeCategory(groupId: string, catId: string) {
-    updateCfg(c => {
-      const g = c.groups.find(x => x.id === groupId);
-      if (g) g.categories = g.categories.filter(x => x.id !== catId);
-    });
+
+  async function removeCategory(groupId: string, catId: string) {
+    setBusy(true);
+    setErr(null);
+    try {
+      await Api.deleteCategory(catId);
+      updateCfg(c => {
+        const g = c.groups.find(x => x.id === groupId);
+        if (g) g.categories = g.categories.filter(x => x.id !== catId);
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Failed to delete category";
+      setErr(msg);
+    } finally {
+      setBusy(false);
+    }
   }
+
   function toggleCategory(groupId: string, catId: string) {
     updateCfg(c => {
       const cat = c.groups.find(g=>g.id===groupId)?.categories.find(x=>x.id===catId);
@@ -132,13 +308,8 @@ export default function Configurations({
         <div className="flex items-center gap-2 text-lg">
           <span className="text-white/80">🧩 Configurations</span>
           {busy && <span className="text-xs text-white/50">saving…</span>}
+          {err && <span className="text-xs text-red-400">{err}</span>}
         </div>
-        <button
-          onClick={persist}
-          className="text-xs rounded-full border border-white/20 px-3 py-1 hover:bg-white/10"
-        >
-          Save
-        </button>
       </div>
 
       <div className="grid grid-cols-[340px_1fr]">
@@ -156,9 +327,6 @@ export default function Configurations({
                     <span className="text-white/80">{g.name}</span>
                   </button>
                   <div className="flex items-center gap-2">
-                    <button onClick={() => toggleGroup(g.id)} title="Collapse/Expand" className="icon-btn">
-                      {g.collapsed ? <ChevronRight className="size-4"/> : <ChevronDown className="size-4" />}
-                    </button>
                     <button onClick={() => {
                       const name = prompt("Rename group", g.name);
                       if (name) renameGroup(g.id, name);

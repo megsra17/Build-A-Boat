@@ -28,6 +28,7 @@ public class AppDb : DbContext
 
     public DbSet<AppRole> Roles => Set<AppRole>();
     public DbSet<Boat> Boats => Set<Boat>();
+    public DbSet<Group> Groups => Set<Group>();
     public DbSet<Category> Categories => Set<Category>();
     public DbSet<OptionGroup> OptionGroups => Set<OptionGroup>();
     public DbSet<Option> Options => Set<Option>();
@@ -88,8 +89,14 @@ public class AppDb : DbContext
         b.Entity<Boat>().Property(x => x.SecondaryImageUrl).HasColumnName("secondary_image_url");
         b.Entity<Boat>().Property(x => x.SideImageUrl).HasColumnName("side_image_url");
         b.Entity<Boat>().Property(x => x.LogoImageUrl).HasColumnName("logo_image_url");
+        b.Entity<Group>().ToTable("group");
+        b.Entity<Group>().Property(x => x.Id).HasColumnName("id");
+        b.Entity<Group>().Property(x => x.BoatId).HasColumnName("boat_id");
+        b.Entity<Group>().Property(x => x.Name).HasColumnName("name");
+        b.Entity<Group>().Property(x => x.SortOrder).HasColumnName("sort_order");
         b.Entity<Category>().ToTable("category");
         b.Entity<Category>().Property(x => x.Id).HasColumnName("id");
+        b.Entity<Category>().Property(x => x.GroupId).HasColumnName("group_id");
         b.Entity<Category>().Property(x => x.BoatId).HasColumnName("boat_id");
         b.Entity<Category>().Property(x => x.Name).HasColumnName("name");
         b.Entity<Category>().Property(x => x.SortOrder).HasColumnName("sort_order");
@@ -123,7 +130,8 @@ public class AppDb : DbContext
 
         // Optional indexes/relationships
         b.Entity<Boat>().HasIndex(x => x.Slug).IsUnique();
-        b.Entity<Category>().HasOne(x => x.Boat).WithMany(x => x.Categories).HasForeignKey(x => x.BoatId);
+        b.Entity<Group>().HasOne(x => x.Boat).WithMany(x => x.Groups).HasForeignKey(x => x.BoatId);
+        b.Entity<Category>().HasOne(x => x.Group).WithMany(x => x.Categories).HasForeignKey(x => x.GroupId);
         b.Entity<OptionGroup>().HasOne(x => x.Category).WithMany(x => x.OptionsGroups).HasForeignKey(x => x.CategoryId);
         b.Entity<Option>().HasOne(x => x.OptionGroup).WithMany(x => x.Options).HasForeignKey(x => x.OptionGroupId);
 
@@ -175,14 +183,27 @@ public class Boat
     public string? SecondaryImageUrl { get; set; }
     public string? SideImageUrl { get; set; }
     public string? LogoImageUrl { get; set; }
+    public ICollection<Group> Groups { get; set; } = new List<Group>();
+    public ICollection<Category> Categories { get; set; } = new List<Category>();
+}
+
+public class Group
+{
+    public Guid Id { get; set; }
+    public Guid BoatId { get; set; }
+    public Boat Boat { get; set; } = default!;
+    public string Name { get; set; } = "";
+    public int SortOrder { get; set; }
     public ICollection<Category> Categories { get; set; } = new List<Category>();
 }
 
 public class Category
 {
     public Guid Id { get; set; }
-    public Guid BoatId { get; set; }
-    public Boat Boat { get; set; } = default!;
+    public Guid GroupId { get; set; }
+    public Group Group { get; set; } = default!;
+    public Guid? BoatId { get; set; }
+    public Boat? Boat { get; set; }
     public string Name { get; set; } = "";
     public int SortOrder { get; set; }
     public bool IsRequired { get; set; }

@@ -13,7 +13,8 @@ public record BoatUpsert(
     List<Guid>? LayerMediaIds
 );
 public record DuplicateBoatDto(string NewSlug, string? NewName, int? NewModelYear);
-public record CategoryUpsert(Guid BoatId, string Name, int SortOrder, bool IsRequired);
+public record GroupUpsert(Guid BoatId, string Name, int SortOrder);
+public record CategoryUpsert(Guid GroupId, string Name, int SortOrder, bool IsRequired, Guid? BoatId = null);
 public record MediaCreateFromUrl(string Url, string? Label);
 public record MediaCreateDto(string Url, string? Label);
 public record OptionGroupUpsert(Guid CategoryId, string Name, string SelectionType, int MinSelect, int MaxSelect, int SortOrder);
