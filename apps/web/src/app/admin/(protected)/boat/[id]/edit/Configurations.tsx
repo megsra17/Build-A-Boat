@@ -138,6 +138,7 @@ export default function Configurations({
   );
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [draggedGroupId, setDraggedGroupId] = useState<string | null>(null);
   const selected = useMemo(
     () => cfg.groups.find(g => g.id === selectedGroupId) ?? null,
     [cfg.groups, selectedGroupId]
@@ -200,6 +201,57 @@ export default function Configurations({
       setErr(msg);
     } finally {
       setBusy(false);
+    }
+  }
+
+  function handleGroupDragStart(id: string) {
+    setDraggedGroupId(id);
+  }
+
+  function handleGroupDragOver(e: React.DragEvent) {
+    e.preventDefault();
+    e.currentTarget.classList.add("bg-white/5");
+  }
+
+  function handleGroupDragLeave(e: React.DragEvent) {
+    e.currentTarget.classList.remove("bg-white/5");
+  }
+
+  async function handleGroupDrop(targetId: string) {
+    if (!draggedGroupId || draggedGroupId === targetId) {
+      setDraggedGroupId(null);
+      return;
+    }
+
+    const draggedIndex = cfg.groups.findIndex(g => g.id === draggedGroupId);
+    const targetIndex = cfg.groups.findIndex(g => g.id === targetId);
+
+    if (draggedIndex < 0 || targetIndex < 0) {
+      setDraggedGroupId(null);
+      return;
+    }
+
+    // Reorder groups
+    updateCfg(c => {
+      const [removed] = c.groups.splice(draggedIndex, 1);
+      c.groups.splice(targetIndex, 0, removed);
+    });
+
+    // Update sort order for all groups
+    setBusy(true);
+    try {
+      for (let i = 0; i < cfg.groups.length; i++) {
+        const group = cfg.groups[i];
+        if (group.id === draggedGroupId || group.id === targetId) {
+          await Api.updateGroup(group.id, group.name);
+        }
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Failed to reorder groups";
+      setErr(msg);
+    } finally {
+      setBusy(false);
+      setDraggedGroupId(null);
     }
   }
 
@@ -317,13 +369,25 @@ export default function Configurations({
         <div className="border-r border-white/10">
           {cfg.groups.map(g => {
             const active = g.id === selectedGroupId;
+            const isDragging = g.id === draggedGroupId;
             return (
-              <div key={g.id} className={`px-3 py-2 border-b border-white/10 ${active ? "bg-[#2a2a2a]" : "bg-transparent"}`}>
+              <div 
+                key={g.id} 
+                draggable
+                onDragStart={() => handleGroupDragStart(g.id)}
+                onDragOver={handleGroupDragOver}
+                onDragLeave={handleGroupDragLeave}
+                onDrop={() => handleGroupDrop(g.id)}
+                className={`px-3 py-2 border-b border-white/10 cursor-move transition-colors ${
+                  active ? "bg-[#2a2a2a]" : "bg-transparent"
+                } ${isDragging ? "opacity-50" : ""}`}
+              >
                 <div className="flex items-center justify-between">
                   <button
                     className="flex items-center gap-2 text-left w-full"
                     onClick={() => setSelectedGroupId(g.id)}
                   >
+                    <GripVertical className="size-4 text-white/40" />
                     <span className="text-white/80">{g.name}</span>
                   </button>
                   <div className="flex items-center gap-2">
