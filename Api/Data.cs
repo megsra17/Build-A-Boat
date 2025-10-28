@@ -200,8 +200,8 @@ public class Group
 public class Category
 {
     public Guid Id { get; set; }
-    public Guid GroupId { get; set; }
-    public Group Group { get; set; } = default!;
+    public Guid? GroupId { get; set; }
+    public Group? Group { get; set; }
     public Guid? BoatId { get; set; }
     public Boat? Boat { get; set; }
     public string Name { get; set; } = "";
