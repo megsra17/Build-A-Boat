@@ -71,10 +71,14 @@ export default function EditBoatPage() {
         boatId={boat.id}
         initial={{
             boatId: boat.id,
-            groups: groups.length > 0 ? groups.map((g: any) => ({
+            groups: (groups && Array.isArray(groups) && groups.length > 0) ? groups.map((g: any) => ({
               id: g.id,
               name: g.name,
-              categories: g.categories || []
+              categories: (g.categories && Array.isArray(g.categories)) ? g.categories.map((c: any) => ({
+                id: c.id,
+                name: c.name,
+                options: []
+              })) : []
             })) : [
               { id: crypto.randomUUID(), name: "Exterior", categories: [] },
             ],
