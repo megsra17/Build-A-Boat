@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Check, X, PencilLine } from "lucide-react";
+import { Check, X, PencilLine, Sailboat, SailboatIcon } from "lucide-react";
 import FolderBrowser from "@/app/components/FolderBrowser";
 
 // Adjust to your types
@@ -142,7 +142,6 @@ export default function BoatTopSection({
         isRequired: false,
       };
       
-      console.log("Assigning category with payload:", payload);
       
       const res = await fetch(`${apiUrl}/admin/category`, {
         method: "POST",
@@ -152,7 +151,6 @@ export default function BoatTopSection({
       
       if (res.ok) {
         const newCat = await res.json();
-        console.log("Category assigned successfully:", newCat);
         setBoatCategories([...boatCategories, newCat]);
         setSelectedCategoryId("");
       } else {
@@ -176,15 +174,12 @@ export default function BoatTopSection({
         headers["Authorization"] = `Bearer ${jwt}`;
       }
       
-      console.log("Deleting category:", categoryId);
-      
       const res = await fetch(`${apiUrl}/admin/category/${categoryId}`, {
         method: "DELETE",
         headers,
       });
       
       if (res.ok) {
-        console.log("Category deleted successfully");
         setBoatCategories(boatCategories.filter(c => c.id !== categoryId));
       } else {
         const errorText = await res.text();
@@ -219,10 +214,7 @@ export default function BoatTopSection({
         logoImageUrl: logo || null,
       };
       
-      console.log("Saving boat with payload:", payload);
-      
       const updated = await BoatsApi.update(boat.id, payload);
-      console.log("Boat saved successfully:", updated);
       
       // Refetch categories to ensure they're up to date
       const jwt = typeof window !== 'undefined' ? (localStorage.getItem("jwt") || sessionStorage.getItem("jwt")) : null;
@@ -233,7 +225,6 @@ export default function BoatTopSection({
       if (catRes.ok) {
         const cats = await catRes.json();
         const catList = Array.isArray(cats) ? cats : cats?.items || [];
-        console.log("Categories refetched:", catList);
         setBoatCategories(catList);
       }
       
@@ -255,7 +246,7 @@ export default function BoatTopSection({
         {/* header row */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2 text-white/90">
-            <svg width="20" height="20" viewBox="0 0 24 24" className="opacity-80"><path fill="currentColor" d="M3 19h18v2H3zm14-8l5 6H2l6-7l4 5zM7 7a3 3 0 1 1 6 0a3 3 0 0 1-6 0"/></svg>
+            <Sailboat className="size-4 absolute left-2 top-1/2 -translate-y-1/2 text-white/50"/>
             <h2 className="text-xl font-semibold">{boat.modelYear} {boat.name}</h2>
           </div>
           <button

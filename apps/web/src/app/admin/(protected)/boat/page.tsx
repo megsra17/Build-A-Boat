@@ -21,13 +21,10 @@ export default function BoatsPage() {
     setBusy(true);
     setError("");
     try{
-      console.log("Loading boats with search:", search);
       const res = await BoatsApi.list(search || undefined);
-      console.log("Boats loaded:", res);
       setRows(res.items);
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
-      console.error("Error loading boats:", message);
       setError("Failed to load boats: " + message);
     } finally {
       setBusy(false);
