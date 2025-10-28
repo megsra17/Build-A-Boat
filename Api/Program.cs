@@ -156,9 +156,35 @@ try
     {
         var db = scope.ServiceProvider.GetRequiredService<AppDb>();
 
-        // Check if group_id column exists in category table, if not add it
         var connection = db.Database.GetDbConnection();
         await connection.OpenAsync();
+
+        // Check if group table exists, if not create it
+        using (var command = connection.CreateCommand())
+        {
+            command.CommandText = @"
+                SELECT EXISTS (
+                    SELECT 1 FROM information_schema.tables 
+                    WHERE table_name = 'group'
+                )";
+            var result = await command.ExecuteScalarAsync();
+            if (result is false)
+            {
+                Console.WriteLine("Creating group table...");
+                command.CommandText = @"
+                    CREATE TABLE ""group"" (
+                        id uuid PRIMARY KEY,
+                        boat_id uuid NOT NULL REFERENCES boat(id) ON DELETE CASCADE,
+                        name varchar(255) NOT NULL,
+                        sort_order integer NOT NULL,
+                        CONSTRAINT fk_group_boat_id FOREIGN KEY (boat_id) REFERENCES boat(id) ON DELETE CASCADE
+                    );";
+                await command.ExecuteNonQueryAsync();
+                Console.WriteLine("Group table created successfully");
+            }
+        }
+
+        // Check if group_id column exists in category table, if not add it
         using (var command = connection.CreateCommand())
         {
             command.CommandText = @"
@@ -187,6 +213,7 @@ try
                 Console.WriteLine("Migration completed: group_id column added to category table");
             }
         }
+
         await connection.CloseAsync();
     }
 }
