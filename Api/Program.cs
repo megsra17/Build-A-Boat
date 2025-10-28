@@ -1490,13 +1490,23 @@ admin.MapPost("/media/folder/delete", async (HttpRequest req, AppDb db, IS3Servi
 // Categories
 // Groups endpoints
 admin.MapGet("/boat/{boatId:guid}/groups", async (Guid boatId, AppDb db) =>
-    Results.Ok(await db.Groups
-        .Where(g => g.BoatId == boatId)
-        .Include(g => g.Categories)
-            .ThenInclude(c => c.OptionsGroups)
-                .ThenInclude(og => og.Options)
-        .OrderBy(g => g.SortOrder)
-        .ToListAsync()));
+{
+    try
+    {
+        var groups = await db.Groups
+            .Where(g => g.BoatId == boatId)
+            .Include(g => g.Categories)
+            .OrderBy(g => g.SortOrder)
+            .ToListAsync();
+        return Results.Ok(groups);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error fetching groups: {ex.Message}");
+        Console.WriteLine($"Stack trace: {ex.StackTrace}");
+        return Results.Problem($"Error fetching groups: {ex.Message}");
+    }
+});
 
 admin.MapPost("/groups", async (GroupUpsert dto, AppDb db) =>
 {
