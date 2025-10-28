@@ -2,6 +2,14 @@
 import { useMemo, useState } from "react";
 import { Plus, Trash2, Pencil, Copy, X, GripVertical, ChevronDown, ChevronRight } from "lucide-react";
 
+type RenameDialogState = {
+  isOpen: boolean;
+  type: "group" | "category" | "option" | null;
+  id: string;
+  groupId?: string;
+  currentName: string;
+};
+
 type Option = { id: string; name: string };
 type Category = { id: string; name: string; options: Option[]; collapsed?: boolean };
 type Group = { id: string; name: string; collapsed?: boolean; categories: Category[] };
@@ -98,7 +106,7 @@ const Api = {
     return res.json();
   },
 
-  updateCategory: async (categoryId: string, name: string) => {
+  updateCategory: async (categoryId: string, name: string, groupId?: string, sortOrder?: number, boatId?: string) => {
     const jwt = typeof window !== 'undefined' ? (localStorage.getItem("jwt") || sessionStorage.getItem("jwt")) : null;
     const apiUrl = getApiBase();
     const headers: Record<string, string> = { "Content-Type": "application/json" };
@@ -106,10 +114,15 @@ const Api = {
       headers["Authorization"] = `Bearer ${jwt}`;
     }
     
+    const body: Record<string, any> = { name };
+    if (groupId) body.groupId = groupId;
+    if (sortOrder !== undefined) body.sortOrder = sortOrder;
+    if (boatId) body.boatId = boatId;
+    
     const res = await fetch(`${apiUrl}/admin/category/${categoryId}`, {
       method: "PATCH",
       headers,
-      body: JSON.stringify({ name }),
+      body: JSON.stringify(body),
     });
     if (!res.ok) throw new Error(await res.text());
     return res.json();
@@ -145,6 +158,13 @@ export default function Configurations({
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [draggedGroupId, setDraggedGroupId] = useState<string | null>(null);
+  const [renameDialog, setRenameDialog] = useState<RenameDialogState>({
+    isOpen: false,
+    type: null,
+    id: "",
+    currentName: "",
+  });
+  const [renameName, setRenameName] = useState("");
   const selected = useMemo(
     () => cfg.groups.find(g => g.id === selectedGroupId) ?? null,
     [cfg.groups, selectedGroupId]
@@ -308,16 +328,52 @@ export default function Configurations({
     setBusy(true);
     setErr(null);
     try {
-      await Api.updateCategory(catId, name);
+      const cat = cfg.groups.find(g=>g.id===groupId)?.categories.find(x=>x.id===catId);
+      if (!cat) return;
+      const sortOrder = cfg.groups.find(g=>g.id===groupId)?.categories.findIndex(x=>x.id===catId) ?? 0;
+      await Api.updateCategory(catId, name, groupId, sortOrder, boatId);
       updateCfg(c => {
         const cat = c.groups.find(g=>g.id===groupId)?.categories.find(x=>x.id===catId);
         if (cat) cat.name = name;
       });
+      closeRenameDialog();
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Failed to rename category";
       setErr(msg);
     } finally {
       setBusy(false);
+    }
+  }
+
+  function openRenameDialog(type: "group" | "category" | "option", id: string, currentName: string, groupId?: string) {
+    setRenameDialog({ isOpen: true, type, id, currentName, groupId });
+    setRenameName(currentName);
+  }
+
+  function closeRenameDialog() {
+    setRenameDialog({ isOpen: false, type: null, id: "", currentName: "" });
+    setRenameName("");
+  }
+
+  async function handleRenameSubmit() {
+    if (!renameName.trim() || renameDialog.type === null) return;
+
+    try {
+      if (renameDialog.type === "group") {
+        await renameGroup(renameDialog.id, renameName.trim());
+      } else if (renameDialog.type === "category" && renameDialog.groupId) {
+        await renameCategory(renameDialog.groupId, renameDialog.id, renameName.trim());
+      } else if (renameDialog.type === "option" && renameDialog.groupId) {
+        // For options, we just update locally since they're not saved to DB yet
+        const parts = renameDialog.id.split("|");
+        if (parts.length === 2) {
+          renameOption(renameDialog.groupId, parts[0], parts[1], renameName.trim());
+          closeRenameDialog();
+        }
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Failed to rename";
+      setErr(msg);
     }
   }
 
@@ -459,8 +515,7 @@ export default function Configurations({
                           <Copy className="size-4"/>
                         </button>
                         <button onClick={() => {
-                          const name = prompt("Rename category", cat.name);
-                          if (name) renameCategory(selected.id, cat.id, name);
+                          openRenameDialog("category", cat.id, cat.name, selected.id);
                         }} title="Rename" className="icon-btn">
                           <Pencil className="size-4"/>
                         </button>
@@ -500,6 +555,46 @@ export default function Configurations({
           )}
         </div>
       </div>
+
+      {/* Rename Modal */}
+      {renameDialog.isOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-[#1a1a1a] border border-white/10 rounded-lg p-6 w-full max-w-md mx-4">
+            <h2 className="text-lg font-semibold mb-4 text-white">
+              Rename {renameDialog.type === "group" ? "Group" : renameDialog.type === "category" ? "Category" : "Option"}
+            </h2>
+            
+            <input
+              type="text"
+              value={renameName}
+              onChange={(e) => setRenameName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleRenameSubmit();
+                if (e.key === "Escape") closeRenameDialog();
+              }}
+              placeholder="Enter new name..."
+              autoFocus
+              className="w-full px-3 py-2 rounded-md bg-[#2a2a2a] border border-white/20 text-white placeholder-white/40 mb-4 outline-none focus:border-white/60"
+            />
+            
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={closeRenameDialog}
+                className="px-4 py-2 rounded-md border border-white/20 text-white/80 hover:bg-white/10"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleRenameSubmit}
+                disabled={!renameName.trim() || busy}
+                className="px-4 py-2 rounded-md bg-white/10 border border-white/20 text-white hover:bg-white/20 disabled:opacity-50"
+              >
+                {busy ? "Saving..." : "Save"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style jsx global>{`
         .icon-btn { @apply rounded-full border border-white/15 p-1.5 hover:bg-white/10 text-white/80; }

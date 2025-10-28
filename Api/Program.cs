@@ -1566,11 +1566,17 @@ admin.MapPatch("/category/{id:guid}", async (Guid id, CategoryUpsert dto, AppDb 
 {
     var c = await db.Categories.FindAsync(id);
     if (c is null) return Results.NotFound();
-    c.GroupId = dto.GroupId;
-    c.BoatId = dto.BoatId;
-    c.Name = dto.Name;
+
+    // Only update the fields that are provided
+    if (!string.IsNullOrEmpty(dto.Name))
+        c.Name = dto.Name;
+    if (dto.GroupId != Guid.Empty)
+        c.GroupId = dto.GroupId;
+    if (dto.BoatId.HasValue)
+        c.BoatId = dto.BoatId;
     c.SortOrder = dto.SortOrder;
     c.IsRequired = dto.IsRequired;
+
     await db.SaveChangesAsync();
     return Results.Ok(c);
 });
