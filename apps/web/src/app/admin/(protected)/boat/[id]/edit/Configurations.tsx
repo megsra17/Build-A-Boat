@@ -75,7 +75,7 @@ const Api = {
     if (!res.ok) throw new Error(await res.text());
   },
 
-  createCategory: async (groupId: string, name: string, sortOrder: number) => {
+  createCategory: async (groupId: string, name: string, sortOrder: number, boatId: string) => {
     const jwt = typeof window !== 'undefined' ? (localStorage.getItem("jwt") || sessionStorage.getItem("jwt")) : null;
     const apiUrl = getApiBase();
     const headers: Record<string, string> = { "Content-Type": "application/json" };
@@ -91,6 +91,7 @@ const Api = {
         name,
         sortOrder,
         isRequired: false,
+        boatId,
       }),
     });
     if (!res.ok) throw new Error(await res.text());
@@ -275,7 +276,7 @@ export default function Configurations({
     try {
       const selected = cfg.groups.find(g => g.id === groupId);
       if (!selected) return;
-      const newCat = await Api.createCategory(groupId, "New Category", selected.categories.length);
+      const newCat = await Api.createCategory(groupId, "New Category", selected.categories.length, boatId);
       updateCfg(c => {
         const g = c.groups.find(x => x.id === groupId);
         if (g) {
