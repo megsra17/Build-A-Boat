@@ -149,6 +149,51 @@ builder.Services.AddAuthorization(o =>
 
 var app = builder.Build();
 
+// Apply database migrations
+try
+{
+    using (var scope = app.Services.CreateScope())
+    {
+        var db = scope.ServiceProvider.GetRequiredService<AppDb>();
+
+        // Check if group_id column exists in category table, if not add it
+        var connection = db.Database.GetDbConnection();
+        await connection.OpenAsync();
+        using (var command = connection.CreateCommand())
+        {
+            command.CommandText = @"
+                SELECT EXISTS (
+                    SELECT 1 FROM information_schema.columns 
+                    WHERE table_name = 'category' AND column_name = 'group_id'
+                )";
+            var result = await command.ExecuteScalarAsync();
+            if (result is false)
+            {
+                Console.WriteLine("Adding group_id column to category table...");
+
+                // Add the column as nullable first
+                command.CommandText = @"
+                    ALTER TABLE category 
+                    ADD COLUMN group_id uuid NULL;";
+                await command.ExecuteNonQueryAsync();
+
+                // Add foreign key constraint
+                command.CommandText = @"
+                    ALTER TABLE category 
+                    ADD CONSTRAINT fk_category_group_id 
+                    FOREIGN KEY (group_id) REFERENCES ""group"" (id) ON DELETE CASCADE;";
+                await command.ExecuteNonQueryAsync();
+
+                Console.WriteLine("Migration completed: group_id column added to category table");
+            }
+        }
+        await connection.CloseAsync();
+    }
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"Migration error: {ex.Message}");
+}
 
 // Global exception handling
 app.UseExceptionHandler(errorApp =>
@@ -1454,7 +1499,18 @@ admin.MapDelete("/groups/{id:guid}", async (Guid id, AppDb db) =>
 });
 
 admin.MapGet("/category", async (AppDb db) =>
-    Results.Ok(new { items = await db.Categories.OrderBy(c => c.Name).ToListAsync() }));
+    Results.Ok(new { items = await db.Categories.Where(c => c.BoatId != null).OrderBy(c => c.Name).ToListAsync() }));
+
+admin.MapGet("/boat-categories", async (AppDb db, string? search) =>
+{
+    var query = db.Categories.Where(c => c.BoatId != null).AsQueryable();
+    if (!string.IsNullOrEmpty(search))
+    {
+        query = query.Where(c => c.Name.ToLower().Contains(search.ToLower()));
+    }
+    var items = await query.OrderBy(c => c.Name).ToListAsync();
+    return Results.Ok(new { items });
+});
 
 admin.MapGet("/boat/{boatId:guid}/category", async (Guid boatId, AppDb db) =>
     Results.Ok(await db.Categories.Where(c => c.BoatId == boatId).OrderBy(c => c.SortOrder).ToListAsync()));

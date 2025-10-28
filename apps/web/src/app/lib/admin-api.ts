@@ -253,7 +253,7 @@ export const CategoriesApi = {
   async list(apts?: {search?: string}) {
     const p = new URLSearchParams();
     if(apts?.search) p.set("search", apts.search);
-    const res = await fetch(`${API}/admin/category?` + p.toString(), {
+    const res = await fetch(`${API}/admin/boat-categories?` + p.toString(), {
       headers: {"Content-Type":"application/json", ...authHeaders()},
       cache: "no-store",
     })
