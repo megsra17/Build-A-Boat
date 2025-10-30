@@ -2372,21 +2372,24 @@ admin.MapPatch("/options/{id:guid}", async (Guid id, OptionUpsert dto, AppDb db)
                 currentOgId = (Guid)result;
             }
 
-            // Use current option group ID if no new one is provided
-            var ogIdToUse = dto.OptionGroupId == Guid.Empty ? currentOgId : dto.OptionGroupId;
+            // Use current option group ID if no new one is provided (or if it's the empty guid)
+            var ogIdToUse = (dto.OptionGroupId == Guid.Empty || dto.OptionGroupId == default) ? currentOgId : dto.OptionGroupId;
 
-            // Verify the option group exists
-            using (var cmd = connection.CreateCommand())
+            // Only verify the option group exists if we're actually changing it
+            if (dto.OptionGroupId != Guid.Empty && dto.OptionGroupId != default && ogIdToUse != currentOgId)
             {
-                cmd.CommandText = "SELECT id FROM option_group WHERE id = @ogId";
-                var p = cmd.CreateParameter();
-                p.ParameterName = "@ogId";
-                p.Value = ogIdToUse;
-                cmd.Parameters.Add(p);
+                using (var cmd = connection.CreateCommand())
+                {
+                    cmd.CommandText = "SELECT id FROM option_group WHERE id = @ogId";
+                    var p = cmd.CreateParameter();
+                    p.ParameterName = "@ogId";
+                    p.Value = ogIdToUse;
+                    cmd.Parameters.Add(p);
 
-                var result = await cmd.ExecuteScalarAsync();
-                if (result is null)
-                    return Results.BadRequest(new { message = "Option group not found" });
+                    var result = await cmd.ExecuteScalarAsync();
+                    if (result is null)
+                        return Results.BadRequest(new { message = "Option group not found" });
+                }
             }
 
             // Now update the option
@@ -2394,7 +2397,7 @@ admin.MapPatch("/options/{id:guid}", async (Guid id, OptionUpsert dto, AppDb db)
             {
                 cmd.CommandText = @"
                     UPDATE ""option""
-                    SET option_group_id = @ogId, sku = @sku, label = @label, description = @desc, 
+                    SET sku = @sku, label = @label, description = @desc, 
                         price_delta = @price, image_url = @imageUrl, is_default = @isDefault, 
                         is_active = @isActive, sort_order = @sortOrder
                     WHERE id = @id";
@@ -2402,11 +2405,6 @@ admin.MapPatch("/options/{id:guid}", async (Guid id, OptionUpsert dto, AppDb db)
                 var p = cmd.CreateParameter();
                 p.ParameterName = "@id";
                 p.Value = id;
-                cmd.Parameters.Add(p);
-
-                p = cmd.CreateParameter();
-                p.ParameterName = "@ogId";
-                p.Value = ogIdToUse;
                 cmd.Parameters.Add(p);
 
                 p = cmd.CreateParameter();
@@ -2452,7 +2450,7 @@ admin.MapPatch("/options/{id:guid}", async (Guid id, OptionUpsert dto, AppDb db)
                 await cmd.ExecuteNonQueryAsync();
             }
 
-            return Results.Ok(new { id, optionGroupId = ogIdToUse, sku = dto.Sku, label = dto.Label, description = dto.Description, price = dto.PriceDelta, imageUrl = dto.ImageUrl, isDefault = dto.IsDefault, isActive = dto.IsActive, sortOrder = dto.SortOrder });
+            return Results.Ok(new { id, optionGroupId = currentOgId, sku = dto.Sku, label = dto.Label, description = dto.Description, price = dto.PriceDelta, imageUrl = dto.ImageUrl, isDefault = dto.IsDefault, isActive = dto.IsActive, sortOrder = dto.SortOrder });
         }
         finally
         {
