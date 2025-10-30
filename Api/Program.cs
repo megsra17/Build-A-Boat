@@ -2356,7 +2356,7 @@ admin.MapPatch("/options/{id:guid}", async (Guid id, OptionUpsert dto, AppDb db)
 
         try
         {
-            // First verify the option exists and get its current option_group_id
+            // Get current option data first
             Guid currentOgId = Guid.Empty;
             using (var cmd = connection.CreateCommand())
             {
@@ -2372,27 +2372,7 @@ admin.MapPatch("/options/{id:guid}", async (Guid id, OptionUpsert dto, AppDb db)
                 currentOgId = (Guid)result;
             }
 
-            // Use current option group ID if no new one is provided (or if it's the empty guid)
-            var ogIdToUse = (dto.OptionGroupId == Guid.Empty || dto.OptionGroupId == default) ? currentOgId : dto.OptionGroupId;
-
-            // Only verify the option group exists if we're actually changing it
-            if (dto.OptionGroupId != Guid.Empty && dto.OptionGroupId != default && ogIdToUse != currentOgId)
-            {
-                using (var cmd = connection.CreateCommand())
-                {
-                    cmd.CommandText = "SELECT id FROM option_group WHERE id = @ogId";
-                    var p = cmd.CreateParameter();
-                    p.ParameterName = "@ogId";
-                    p.Value = ogIdToUse;
-                    cmd.Parameters.Add(p);
-
-                    var result = await cmd.ExecuteScalarAsync();
-                    if (result is null)
-                        return Results.BadRequest(new { message = "Option group not found" });
-                }
-            }
-
-            // Now update the option
+            // Update only the fields we care about (NOT option_group_id)
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = @"
