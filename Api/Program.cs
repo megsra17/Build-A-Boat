@@ -1718,14 +1718,17 @@ admin.MapGet("/boat/{boatId:guid}/groups", async (Guid boatId, AppDb db) =>
     try
     {
         Console.WriteLine($"[GROUPS] Fetching groups for boat: {boatId}");
+
+        var groups = new List<GroupDetailDto>();
+
+        // Get all groups for this boat
+        var groupsList = new List<(Guid Id, Guid BoatId, string Name, int SortOrder)>();
+
         var connection = db.Database.GetDbConnection();
         await connection.OpenAsync();
 
         try
         {
-            var groups = new List<GroupDetailDto>();
-
-            // Get all groups for this boat
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = "SELECT id, boat_id, name, sort_order FROM \"group\" WHERE boat_id = @boatId ORDER BY sort_order";
@@ -1734,30 +1737,20 @@ admin.MapGet("/boat/{boatId:guid}/groups", async (Guid boatId, AppDb db) =>
                 param.Value = boatId;
                 cmd.Parameters.Add(param);
 
-                try
+                using var reader = await cmd.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
                 {
-                    var groupsList = new List<(Guid Id, Guid BoatId, string Name, int SortOrder)>();
-                    using var reader = await cmd.ExecuteReaderAsync();
-                    while (await reader.ReadAsync())
-                    {
-                        groupsList.Add((reader.GetGuid(0), reader.GetGuid(1), reader.GetString(2), reader.GetInt32(3)));
-                    }
-
-                    Console.WriteLine($"[GROUPS] ✓ Found {groupsList.Count} groups");
-
-                    // Load details for each group using new connections
-                    foreach (var (groupId, boatIdVal, groupName, sortOrder) in groupsList)
-                    {
-                        var categories = await LoadCategoriesForGroup(db, groupId);
-                        groups.Add(new GroupDetailDto(groupId, boatIdVal, groupName, sortOrder, categories));
-                    }
+                    groupsList.Add((reader.GetGuid(0), reader.GetGuid(1), reader.GetString(2), reader.GetInt32(3)));
                 }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"[GROUPS] ❌ Error executing groups query: {ex.Message}");
-                    Console.WriteLine($"[GROUPS] SQL: {cmd.CommandText}");
-                    throw;
-                }
+            }
+
+            Console.WriteLine($"[GROUPS] ✓ Found {groupsList.Count} groups");
+
+            // Load details for each group
+            foreach (var (groupId, boatIdVal, groupName, sortOrder) in groupsList)
+            {
+                var categories = await LoadCategoriesForGroup(connection, groupId);
+                groups.Add(new GroupDetailDto(groupId, boatIdVal, groupName, sortOrder, categories));
             }
 
             return Results.Ok(groups);
@@ -1774,155 +1767,95 @@ admin.MapGet("/boat/{boatId:guid}/groups", async (Guid boatId, AppDb db) =>
         return Results.Problem($"Error fetching groups: {ex.Message}");
     }
 
-    async Task<List<CategoryDetailDto>> LoadCategoriesForGroup(AppDb dbContext, Guid groupId)
+    async Task<List<CategoryDetailDto>> LoadCategoriesForGroup(System.Data.Common.DbConnection conn, Guid groupId)
     {
         var categories = new List<CategoryDetailDto>();
-
-        // First, load all category IDs for this group
         var categoryIds = new List<(Guid Id, string Name, int SortOrder, bool IsRequired)>();
 
-        var conn = dbContext.Database.GetDbConnection();
-        await conn.OpenAsync();
-
-        try
+        using (var cmd = conn.CreateCommand())
         {
-            using (var cmd = conn.CreateCommand())
-            {
-                cmd.CommandText = "SELECT id, name, sort_order, is_required FROM category WHERE group_id = @groupId ORDER BY sort_order";
-                var param = cmd.CreateParameter();
-                param.ParameterName = "@groupId";
-                param.Value = groupId;
-                cmd.Parameters.Add(param);
+            cmd.CommandText = "SELECT id, name, sort_order, is_required FROM category WHERE group_id = @groupId ORDER BY sort_order";
+            var param = cmd.CreateParameter();
+            param.ParameterName = "@groupId";
+            param.Value = groupId;
+            cmd.Parameters.Add(param);
 
-                try
-                {
-                    using var reader = await cmd.ExecuteReaderAsync();
-                    while (await reader.ReadAsync())
-                    {
-                        categoryIds.Add((reader.GetGuid(0), reader.GetString(1), reader.GetInt32(2), reader.GetBoolean(3)));
-                    }
-                    Console.WriteLine($"[GROUPS] ✓ Loaded {categoryIds.Count} categories for group {groupId}");
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"[GROUPS] ❌ Error loading categories for group {groupId}: {ex.Message}");
-                    throw;
-                }
-            }
-
-            // Now load option groups for each category using a NEW connection
-            foreach (var (catId, catName, sortOrder, isRequired) in categoryIds)
+            using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
             {
-                var optionGroups = await LoadOptionGroupsForCategory(dbContext, catId);
-                categories.Add(new CategoryDetailDto(catId, groupId, catName, sortOrder, isRequired, optionGroups));
+                categoryIds.Add((reader.GetGuid(0), reader.GetString(1), reader.GetInt32(2), reader.GetBoolean(3)));
             }
+            Console.WriteLine($"[GROUPS] ✓ Loaded {categoryIds.Count} categories for group {groupId}");
         }
-        finally
+
+        foreach (var (catId, catName, sortOrder, isRequired) in categoryIds)
         {
-            await conn.CloseAsync();
+            var optionGroups = await LoadOptionGroupsForCategory(conn, catId);
+            categories.Add(new CategoryDetailDto(catId, groupId, catName, sortOrder, isRequired, optionGroups));
         }
 
         return categories;
     }
 
-    async Task<List<OptionGroupDetailDto>> LoadOptionGroupsForCategory(AppDb dbContext, Guid categoryId)
+    async Task<List<OptionGroupDetailDto>> LoadOptionGroupsForCategory(System.Data.Common.DbConnection conn, Guid categoryId)
     {
         var optionGroups = new List<OptionGroupDetailDto>();
-
-        // First, load all option group IDs for this category
         var ogList = new List<(Guid Id, string Name, string SelectionType, int MinSelect, int MaxSelect, int SortOrder)>();
 
-        var conn = dbContext.Database.GetDbConnection();
-        await conn.OpenAsync();
-
-        try
+        using (var cmd = conn.CreateCommand())
         {
-            using (var cmd = conn.CreateCommand())
-            {
-                cmd.CommandText = "SELECT id, name, selection_type, min_select, max_select, sort_order FROM option_group WHERE category_id = @categoryId ORDER BY sort_order";
-                var param = cmd.CreateParameter();
-                param.ParameterName = "@categoryId";
-                param.Value = categoryId;
-                cmd.Parameters.Add(param);
+            cmd.CommandText = "SELECT id, name, selection_type, min_select, max_select, sort_order FROM option_group WHERE category_id = @categoryId ORDER BY sort_order";
+            var param = cmd.CreateParameter();
+            param.ParameterName = "@categoryId";
+            param.Value = categoryId;
+            cmd.Parameters.Add(param);
 
-                try
-                {
-                    using var reader = await cmd.ExecuteReaderAsync();
-                    while (await reader.ReadAsync())
-                    {
-                        ogList.Add((reader.GetGuid(0), reader.GetString(1), reader.GetString(2), reader.GetInt32(3), reader.GetInt32(4), reader.GetInt32(5)));
-                    }
-                    Console.WriteLine($"[GROUPS] ✓ Loaded {ogList.Count} option groups for category {categoryId}");
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"[GROUPS] ❌ Error loading option groups: {ex.Message}");
-                    throw;
-                }
-            }
-
-            // Load options for each option group using a NEW connection
-            foreach (var (ogId, ogName, selectionType, minSelect, maxSelect, sortOrder) in ogList)
+            using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
             {
-                var options = await LoadOptionsForGroup(dbContext, ogId);
-                optionGroups.Add(new OptionGroupDetailDto(ogId, categoryId, ogName, selectionType, minSelect, maxSelect, sortOrder, options));
+                ogList.Add((reader.GetGuid(0), reader.GetString(1), reader.GetString(2), reader.GetInt32(3), reader.GetInt32(4), reader.GetInt32(5)));
             }
+            Console.WriteLine($"[GROUPS] ✓ Loaded {ogList.Count} option groups for category {categoryId}");
         }
-        finally
+
+        foreach (var (ogId, ogName, selectionType, minSelect, maxSelect, sortOrder) in ogList)
         {
-            await conn.CloseAsync();
+            var options = await LoadOptionsForGroup(conn, ogId);
+            optionGroups.Add(new OptionGroupDetailDto(ogId, categoryId, ogName, selectionType, minSelect, maxSelect, sortOrder, options));
         }
 
         return optionGroups;
     }
 
-    async Task<List<OptionDetailDto>> LoadOptionsForGroup(AppDb dbContext, Guid ogId)
+    async Task<List<OptionDetailDto>> LoadOptionsForGroup(System.Data.Common.DbConnection conn, Guid ogId)
     {
         var options = new List<OptionDetailDto>();
 
-        var conn = dbContext.Database.GetDbConnection();
-        await conn.OpenAsync();
-
-        try
+        using (var cmd = conn.CreateCommand())
         {
-            using (var cmd = conn.CreateCommand())
+            cmd.CommandText = "SELECT id, option_group_id, sku, label, description, price_delta, image_url, is_default, is_active, sort_order FROM \"option\" WHERE option_group_id = @ogId ORDER BY sort_order";
+            var param = cmd.CreateParameter();
+            param.ParameterName = "@ogId";
+            param.Value = ogId;
+            cmd.Parameters.Add(param);
+
+            using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
             {
-                cmd.CommandText = "SELECT id, option_group_id, sku, label, description, price_delta, image_url, is_default, is_active, sort_order FROM \"option\" WHERE option_group_id = @ogId ORDER BY sort_order";
-                var param = cmd.CreateParameter();
-                param.ParameterName = "@ogId";
-                param.Value = ogId;
-                cmd.Parameters.Add(param);
-
-                try
-                {
-                    using var reader = await cmd.ExecuteReaderAsync();
-                    while (await reader.ReadAsync())
-                    {
-                        options.Add(new OptionDetailDto(
-                            reader.GetGuid(0),
-                            reader.GetGuid(1),
-                            reader.IsDBNull(2) ? null : reader.GetString(2),
-                            reader.GetString(3),
-                            reader.IsDBNull(4) ? null : reader.GetString(4),
-                            reader.GetDecimal(5),
-                            reader.IsDBNull(6) ? null : reader.GetString(6),
-                            reader.GetBoolean(7),
-                            reader.GetBoolean(8),
-                            reader.GetInt32(9)
-                        ));
-                    }
-                    Console.WriteLine($"[GROUPS] ✓ Loaded {options.Count} options for option group {ogId}");
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"[GROUPS] ❌ Error loading options: {ex.Message}");
-                    throw;
-                }
+                options.Add(new OptionDetailDto(
+                    reader.GetGuid(0),
+                    reader.GetGuid(1),
+                    reader.IsDBNull(2) ? null : reader.GetString(2),
+                    reader.GetString(3),
+                    reader.IsDBNull(4) ? null : reader.GetString(4),
+                    reader.GetDecimal(5),
+                    reader.IsDBNull(6) ? null : reader.GetString(6),
+                    reader.GetBoolean(7),
+                    reader.GetBoolean(8),
+                    reader.GetInt32(9)
+                ));
             }
-        }
-        finally
-        {
-            await conn.CloseAsync();
+            Console.WriteLine($"[GROUPS] ✓ Loaded {options.Count} options for option group {ogId}");
         }
 
         return options;
