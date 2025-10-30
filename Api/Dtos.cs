@@ -14,6 +14,10 @@ public record BoatUpsert(
 );
 public record DuplicateBoatDto(string NewSlug, string? NewName, int? NewModelYear);
 public record GroupUpsert(Guid BoatId, string Name, int SortOrder);
+public record GroupDetailDto(Guid Id, Guid BoatId, string Name, int SortOrder, List<CategoryDetailDto> Categories);
+public record CategoryDetailDto(Guid Id, Guid? GroupId, string Name, int SortOrder, bool IsRequired, List<OptionGroupDetailDto> OptionsGroups);
+public record OptionGroupDetailDto(Guid Id, Guid CategoryId, string Name, string SelectionType, int MinSelect, int MaxSelect, int SortOrder, List<OptionDetailDto> Options);
+public record OptionDetailDto(Guid id, Guid OptionGroupId, string? Sku, string Label, string? Description, decimal Price, string? ImageUrl, bool IsDefault, bool IsActive, int SortOrder);
 public record CategoryUpsert(Guid GroupId, string Name, int SortOrder, bool IsRequired);
 public record BoatCategoryUpsert(string Name, int SortOrder);
 public record BoatCategoryRow(Guid Id, string Name, int SortOrder);

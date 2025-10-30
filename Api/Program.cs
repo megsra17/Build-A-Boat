@@ -1719,7 +1719,43 @@ admin.MapGet("/boat/{boatId:guid}/groups", async (Guid boatId, AppDb db) =>
             .OrderBy(g => g.SortOrder)
             .ToListAsync();
 
-        return Results.Ok(groups);
+        // Map to DTOs to avoid circular references
+        var result = groups.Select(g => new GroupDetailDto(
+            g.Id,
+            g.BoatId,
+            g.Name,
+            g.SortOrder,
+            g.Categories.Select(c => new CategoryDetailDto(
+                c.Id,
+                c.GroupId,
+                c.Name,
+                c.SortOrder,
+                c.IsRequired,
+                c.OptionsGroups.Select(og => new OptionGroupDetailDto(
+                    og.Id,
+                    og.CategoryId,
+                    og.Name,
+                    og.SelectionType,
+                    og.MinSelect,
+                    og.MaxSelect,
+                    og.SortOrder,
+                    og.Options.Select(o => new OptionDetailDto(
+                        o.id,
+                        o.OptionGroupId,
+                        o.Sku,
+                        o.Label,
+                        o.Description,
+                        o.Price,
+                        o.ImageUrl,
+                        o.IsDefault,
+                        o.IsActive,
+                        o.SortOrder
+                    )).ToList()
+                )).ToList()
+            )).ToList()
+        )).ToList();
+
+        return Results.Ok(result);
     }
     catch (Exception ex)
     {
