@@ -1710,49 +1710,77 @@ admin.MapGet("/boat/{boatId:guid}/groups", async (Guid boatId, AppDb db) =>
 {
     try
     {
+        // Load groups first
         var groups = await db.Groups
             .AsNoTracking()
             .Where(g => g.BoatId == boatId)
-            .Include(g => g.Categories)
-            .ThenInclude(c => c.OptionsGroups)
-            .ThenInclude(og => og.Options)
             .OrderBy(g => g.SortOrder)
             .ToListAsync();
 
-        // Map to DTOs to avoid circular references
+        // Load all categories for these groups
+        var groupIds = groups.Select(g => g.Id).ToList();
+        var categories = await db.Categories
+            .AsNoTracking()
+            .Where(c => c.GroupId.HasValue && groupIds.Contains(c.GroupId.Value))
+            .OrderBy(c => c.SortOrder)
+            .ToListAsync();
+
+        // Load all option groups for these categories
+        var categoryIds = categories.Select(c => c.Id).ToList();
+        var optionGroups = await db.OptionGroups
+            .AsNoTracking()
+            .Where(og => categoryIds.Contains(og.CategoryId))
+            .OrderBy(og => og.SortOrder)
+            .ToListAsync();
+
+        // Load all options for these option groups
+        var optionGroupIds = optionGroups.Select(og => og.Id).ToList();
+        var options = await db.Options
+            .AsNoTracking()
+            .Where(o => optionGroupIds.Contains(o.OptionGroupId))
+            .OrderBy(o => o.SortOrder)
+            .ToListAsync();
+
+        // Build the result in memory
         var result = groups.Select(g => new GroupDetailDto(
             g.Id,
             g.BoatId,
             g.Name,
             g.SortOrder,
-            g.Categories.Select(c => new CategoryDetailDto(
-                c.Id,
-                c.GroupId,
-                c.Name,
-                c.SortOrder,
-                c.IsRequired,
-                c.OptionsGroups.Select(og => new OptionGroupDetailDto(
-                    og.Id,
-                    og.CategoryId,
-                    og.Name,
-                    og.SelectionType,
-                    og.MinSelect,
-                    og.MaxSelect,
-                    og.SortOrder,
-                    og.Options.Select(o => new OptionDetailDto(
-                        o.id,
-                        o.OptionGroupId,
-                        o.Sku,
-                        o.Label,
-                        o.Description,
-                        o.Price,
-                        o.ImageUrl,
-                        o.IsDefault,
-                        o.IsActive,
-                        o.SortOrder
-                    )).ToList()
+            categories
+                .Where(c => c.GroupId == g.Id)
+                .Select(c => new CategoryDetailDto(
+                    c.Id,
+                    c.GroupId,
+                    c.Name,
+                    c.SortOrder,
+                    c.IsRequired,
+                    optionGroups
+                        .Where(og => og.CategoryId == c.Id)
+                        .Select(og => new OptionGroupDetailDto(
+                            og.Id,
+                            og.CategoryId,
+                            og.Name,
+                            og.SelectionType,
+                            og.MinSelect,
+                            og.MaxSelect,
+                            og.SortOrder,
+                            options
+                                .Where(o => o.OptionGroupId == og.Id)
+                                .Select(o => new OptionDetailDto(
+                                    o.id,
+                                    o.OptionGroupId,
+                                    o.Sku,
+                                    o.Label,
+                                    o.Description,
+                                    o.Price,
+                                    o.ImageUrl,
+                                    o.IsDefault,
+                                    o.IsActive,
+                                    o.SortOrder
+                                )).ToList()
+                        )).ToList()
                 )).ToList()
-            )).ToList()
         )).ToList();
 
         return Results.Ok(result);
