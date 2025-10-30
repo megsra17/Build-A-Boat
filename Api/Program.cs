@@ -1711,17 +1711,12 @@ admin.MapPost("/media/folder/delete", async (HttpRequest req, AppDb db, IS3Servi
     }
 });
 
-// Categories
 // Groups endpoints
 admin.MapGet("/boat/{boatId:guid}/groups", async (Guid boatId, AppDb db) =>
 {
     try
     {
-        Console.WriteLine($"[GROUPS] Fetching groups for boat: {boatId}");
-
         var groups = new List<GroupDetailDto>();
-
-        // Get all groups for this boat
         var groupsList = new List<(Guid Id, Guid BoatId, string Name, int SortOrder)>();
 
         var connection = db.Database.GetDbConnection();
@@ -1744,9 +1739,6 @@ admin.MapGet("/boat/{boatId:guid}/groups", async (Guid boatId, AppDb db) =>
                 }
             }
 
-            Console.WriteLine($"[GROUPS] ✓ Found {groupsList.Count} groups");
-
-            // Load details for each group
             foreach (var (groupId, boatIdVal, groupName, sortOrder) in groupsList)
             {
                 var categories = await LoadCategoriesForGroup(connection, groupId);
@@ -1762,11 +1754,9 @@ admin.MapGet("/boat/{boatId:guid}/groups", async (Guid boatId, AppDb db) =>
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"[GROUPS] ❌ Fatal error: {ex.Message}");
-        Console.WriteLine($"[GROUPS] Stack trace: {ex.StackTrace}");
+        Console.WriteLine($"[GROUPS] Error: {ex.Message}");
         return Results.Problem($"Error fetching groups: {ex.Message}");
     }
-
     async Task<List<CategoryDetailDto>> LoadCategoriesForGroup(System.Data.Common.DbConnection conn, Guid groupId)
     {
         var categories = new List<CategoryDetailDto>();
@@ -1785,7 +1775,6 @@ admin.MapGet("/boat/{boatId:guid}/groups", async (Guid boatId, AppDb db) =>
             {
                 categoryIds.Add((reader.GetGuid(0), reader.GetString(1), reader.GetInt32(2), reader.GetBoolean(3)));
             }
-            Console.WriteLine($"[GROUPS] ✓ Loaded {categoryIds.Count} categories for group {groupId}");
         }
 
         foreach (var (catId, catName, sortOrder, isRequired) in categoryIds)
@@ -1815,7 +1804,6 @@ admin.MapGet("/boat/{boatId:guid}/groups", async (Guid boatId, AppDb db) =>
             {
                 ogList.Add((reader.GetGuid(0), reader.GetString(1), reader.GetString(2), reader.GetInt32(3), reader.GetInt32(4), reader.GetInt32(5)));
             }
-            Console.WriteLine($"[GROUPS] ✓ Loaded {ogList.Count} option groups for category {categoryId}");
         }
 
         foreach (var (ogId, ogName, selectionType, minSelect, maxSelect, sortOrder) in ogList)
@@ -1855,7 +1843,6 @@ admin.MapGet("/boat/{boatId:guid}/groups", async (Guid boatId, AppDb db) =>
                     reader.GetInt32(9)
                 ));
             }
-            Console.WriteLine($"[GROUPS] ✓ Loaded {options.Count} options for option group {ogId}");
         }
 
         return options;
@@ -1997,29 +1984,100 @@ admin.MapPost("/category", async (CategoryUpsert dto, AppDb db) =>
 // Update category
 admin.MapPatch("/category/{id:guid}", async (Guid id, CategoryUpsert dto, AppDb db) =>
 {
-    var c = await db.Categories.FindAsync(id);
-    if (c is null) return Results.NotFound();
+    try
+    {
+        var connection = db.Database.GetDbConnection();
+        await connection.OpenAsync();
 
-    // Only update the fields that are provided
-    if (!string.IsNullOrEmpty(dto.Name))
-        c.Name = dto.Name;
-    if (dto.GroupId != Guid.Empty)
-        c.GroupId = dto.GroupId;
-    c.SortOrder = dto.SortOrder;
-    c.IsRequired = dto.IsRequired;
+        try
+        {
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = @"
+                    UPDATE category
+                    SET name = @name, group_id = @groupId, sort_order = @sortOrder, is_required = @isRequired
+                    WHERE id = @id";
 
-    await db.SaveChangesAsync();
-    return Results.Ok(c);
+                var p = cmd.CreateParameter();
+                p.ParameterName = "@id";
+                p.Value = id;
+                cmd.Parameters.Add(p);
+
+                p = cmd.CreateParameter();
+                p.ParameterName = "@name";
+                p.Value = dto.Name ?? (object)DBNull.Value;
+                cmd.Parameters.Add(p);
+
+                p = cmd.CreateParameter();
+                p.ParameterName = "@groupId";
+                p.Value = dto.GroupId != Guid.Empty ? (object)dto.GroupId : DBNull.Value;
+                cmd.Parameters.Add(p);
+
+                p = cmd.CreateParameter();
+                p.ParameterName = "@sortOrder";
+                p.Value = dto.SortOrder;
+                cmd.Parameters.Add(p);
+
+                p = cmd.CreateParameter();
+                p.ParameterName = "@isRequired";
+                p.Value = dto.IsRequired;
+                cmd.Parameters.Add(p);
+
+                var rowsAffected = await cmd.ExecuteNonQueryAsync();
+                if (rowsAffected == 0)
+                    return Results.NotFound();
+            }
+
+            await connection.CloseAsync();
+            return Results.Ok(new { id, name = dto.Name, groupId = dto.GroupId, sortOrder = dto.SortOrder, isRequired = dto.IsRequired });
+        }
+        finally
+        {
+            await connection.CloseAsync();
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error updating category: {ex.Message}");
+        return Results.Problem($"Error updating category: {ex.Message}");
+    }
 });
 
 // Delete category
 admin.MapDelete("/category/{id:guid}", async (Guid id, AppDb db) =>
 {
-    var c = await db.Categories.FindAsync(id);
-    if (c is null) return Results.NotFound();
-    db.Categories.Remove(c);
-    await db.SaveChangesAsync();
-    return Results.NoContent();
+    try
+    {
+        var connection = db.Database.GetDbConnection();
+        await connection.OpenAsync();
+
+        try
+        {
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = "DELETE FROM category WHERE id = @id";
+                var param = cmd.CreateParameter();
+                param.ParameterName = "@id";
+                param.Value = id;
+                cmd.Parameters.Add(param);
+
+                var rowsAffected = await cmd.ExecuteNonQueryAsync();
+                if (rowsAffected == 0)
+                    return Results.NotFound();
+            }
+
+            return Results.NoContent();
+        }
+        finally
+        {
+            await connection.CloseAsync();
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error deleting category: {ex.Message}");
+        return Results.Problem($"Error deleting category: {ex.Message}");
+    }
 });
 
 // Option groups
@@ -2047,26 +2105,111 @@ admin.MapPost("/option-groups", async (OptionGroupUpsert dto, AppDb db) =>
 // Update option group
 admin.MapPatch("/option-groups/{id:guid}", async (Guid id, OptionGroupUpsert dto, AppDb db) =>
 {
-    var g = await db.OptionGroups.FindAsync(id);
-    if (g is null) return Results.NotFound();
-    g.CategoryId = dto.CategoryId;
-    g.Name = dto.Name;
-    g.SelectionType = dto.SelectionType;
-    g.MinSelect = dto.MinSelect;
-    g.MaxSelect = dto.MaxSelect;
-    g.SortOrder = dto.SortOrder;
-    await db.SaveChangesAsync();
-    return Results.Ok(g);
+    try
+    {
+        var connection = db.Database.GetDbConnection();
+        await connection.OpenAsync();
+
+        try
+        {
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = @"
+                    UPDATE option_group
+                    SET category_id = @categoryId, name = @name, selection_type = @selectionType, 
+                        min_select = @minSelect, max_select = @maxSelect, sort_order = @sortOrder
+                    WHERE id = @id";
+
+                var p = cmd.CreateParameter();
+                p.ParameterName = "@id";
+                p.Value = id;
+                cmd.Parameters.Add(p);
+
+                p = cmd.CreateParameter();
+                p.ParameterName = "@categoryId";
+                p.Value = dto.CategoryId;
+                cmd.Parameters.Add(p);
+
+                p = cmd.CreateParameter();
+                p.ParameterName = "@name";
+                p.Value = dto.Name;
+                cmd.Parameters.Add(p);
+
+                p = cmd.CreateParameter();
+                p.ParameterName = "@selectionType";
+                p.Value = dto.SelectionType;
+                cmd.Parameters.Add(p);
+
+                p = cmd.CreateParameter();
+                p.ParameterName = "@minSelect";
+                p.Value = dto.MinSelect;
+                cmd.Parameters.Add(p);
+
+                p = cmd.CreateParameter();
+                p.ParameterName = "@maxSelect";
+                p.Value = dto.MaxSelect;
+                cmd.Parameters.Add(p);
+
+                p = cmd.CreateParameter();
+                p.ParameterName = "@sortOrder";
+                p.Value = dto.SortOrder;
+                cmd.Parameters.Add(p);
+
+                var rowsAffected = await cmd.ExecuteNonQueryAsync();
+                if (rowsAffected == 0)
+                    return Results.NotFound();
+            }
+
+            await connection.CloseAsync();
+            return Results.Ok(new { id, categoryId = dto.CategoryId, name = dto.Name, selectionType = dto.SelectionType, minSelect = dto.MinSelect, maxSelect = dto.MaxSelect, sortOrder = dto.SortOrder });
+        }
+        finally
+        {
+            await connection.CloseAsync();
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error updating option group: {ex.Message}");
+        return Results.Problem($"Error updating option group: {ex.Message}");
+    }
 });
 
 // Delete option group
 admin.MapDelete("/option-groups/{id:guid}", async (Guid id, AppDb db) =>
 {
-    var g = await db.OptionGroups.FindAsync(id);
-    if (g is null) return Results.NotFound();
-    db.OptionGroups.Remove(g);
-    await db.SaveChangesAsync();
-    return Results.NoContent();
+    try
+    {
+        var connection = db.Database.GetDbConnection();
+        await connection.OpenAsync();
+
+        try
+        {
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = "DELETE FROM option_group WHERE id = @id";
+                var param = cmd.CreateParameter();
+                param.ParameterName = "@id";
+                param.Value = id;
+                cmd.Parameters.Add(param);
+
+                var rowsAffected = await cmd.ExecuteNonQueryAsync();
+                if (rowsAffected == 0)
+                    return Results.NotFound();
+            }
+
+            return Results.NoContent();
+        }
+        finally
+        {
+            await connection.CloseAsync();
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error deleting option group: {ex.Message}");
+        return Results.Problem($"Error deleting option group: {ex.Message}");
+    }
 });
 
 // Options
@@ -2206,29 +2349,97 @@ admin.MapPost("/options", async (OptionUpsert dto, AppDb db) =>
 // Update option
 admin.MapPatch("/options/{id:guid}", async (Guid id, OptionUpsert dto, AppDb db) =>
 {
-    var o = await db.Options.FindAsync(id);
-    if (o is null) return Results.NotFound();
-    o.OptionGroupId = dto.OptionGroupId;
-    o.Sku = dto.Sku;
-    o.Label = dto.Label;
-    o.Description = dto.Description;
-    o.Price = dto.PriceDelta;
-    o.ImageUrl = dto.ImageUrl;
-    o.IsDefault = dto.IsDefault;
-    o.IsActive = dto.IsActive;
-    o.SortOrder = dto.SortOrder;
-    await db.SaveChangesAsync();
-    return Results.Ok(o);
+    try
+    {
+        var connection = db.Database.GetDbConnection();
+        await connection.OpenAsync();
+
+        try
+        {
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = @"
+                    UPDATE ""option""
+                    SET option_group_id = @ogId, sku = @sku, label = @label, description = @desc, 
+                        price_delta = @price, image_url = @imageUrl, is_default = @isDefault, 
+                        is_active = @isActive, sort_order = @sortOrder
+                    WHERE id = @id";
+
+                cmd.Parameters.Add(CreateParameter(cmd, "@id", id));
+                cmd.Parameters.Add(CreateParameter(cmd, "@ogId", dto.OptionGroupId));
+                cmd.Parameters.Add(CreateParameter(cmd, "@sku", dto.Sku));
+                cmd.Parameters.Add(CreateParameter(cmd, "@label", dto.Label));
+                cmd.Parameters.Add(CreateParameter(cmd, "@desc", dto.Description));
+                cmd.Parameters.Add(CreateParameter(cmd, "@price", dto.PriceDelta));
+                cmd.Parameters.Add(CreateParameter(cmd, "@imageUrl", dto.ImageUrl));
+                cmd.Parameters.Add(CreateParameter(cmd, "@isDefault", dto.IsDefault));
+                cmd.Parameters.Add(CreateParameter(cmd, "@isActive", dto.IsActive));
+                cmd.Parameters.Add(CreateParameter(cmd, "@sortOrder", dto.SortOrder));
+
+                var rowsAffected = await cmd.ExecuteNonQueryAsync();
+                if (rowsAffected == 0)
+                    return Results.NotFound();
+            }
+
+            await connection.CloseAsync();
+
+            return Results.Ok(new { id, optionGroupId = dto.OptionGroupId, sku = dto.Sku, label = dto.Label, description = dto.Description, price = dto.PriceDelta, imageUrl = dto.ImageUrl, isDefault = dto.IsDefault, isActive = dto.IsActive, sortOrder = dto.SortOrder });
+        }
+        finally
+        {
+            await connection.CloseAsync();
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error updating option: {ex.Message}");
+        return Results.Problem($"Error updating option: {ex.Message}");
+    }
+
+    System.Data.Common.DbParameter CreateParameter(System.Data.Common.DbCommand cmd, string name, object? value)
+    {
+        var param = cmd.CreateParameter();
+        param.ParameterName = name;
+        param.Value = value ?? (object)DBNull.Value;
+        return param;
+    }
 });
 
 // Delete option
 admin.MapDelete("/options/{id:guid}", async (Guid id, AppDb db) =>
 {
-    var o = await db.Options.FindAsync(id);
-    if (o is null) return Results.NotFound();
-    db.Options.Remove(o);
-    await db.SaveChangesAsync();
-    return Results.NoContent();
+    try
+    {
+        var connection = db.Database.GetDbConnection();
+        await connection.OpenAsync();
+
+        try
+        {
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = "DELETE FROM \"option\" WHERE id = @id";
+                var param = cmd.CreateParameter();
+                param.ParameterName = "@id";
+                param.Value = id;
+                cmd.Parameters.Add(param);
+
+                var rowsAffected = await cmd.ExecuteNonQueryAsync();
+                if (rowsAffected == 0)
+                    return Results.NotFound();
+            }
+
+            return Results.NoContent();
+        }
+        finally
+        {
+            await connection.CloseAsync();
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error deleting option: {ex.Message}");
+        return Results.Problem($"Error deleting option: {ex.Message}");
+    }
 });
 
 // Debug endpoints (only available in development)
