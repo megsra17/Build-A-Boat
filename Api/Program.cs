@@ -1598,7 +1598,7 @@ admin.MapDelete("/groups/{id:guid}", async (Guid id, AppDb db) =>
 });
 
 admin.MapGet("/category", async (AppDb db) =>
-    Results.Ok(new { items = await db.Categories.Where(c => c.BoatId != null).OrderBy(c => c.Name).ToListAsync() }));
+    Results.Ok(new { items = await db.Categories.Where(c => c.GroupId != null).OrderBy(c => c.Name).ToListAsync() }));
 
 admin.MapGet("/boat-categories", async (AppDb db, string? search) =>
 {
@@ -1647,7 +1647,7 @@ admin.MapDelete("/boat-categories/{id:guid}", async (Guid id, AppDb db) =>
     return Results.NoContent();
 });
 
-// Add boat to boat category
+// Assign boat to boat category (updates boat.boat_category_id)
 admin.MapPost("/boat-categories/{boatCategoryId:guid}/boats/{boatId:guid}", async (Guid boatCategoryId, Guid boatId, AppDb db) =>
 {
     var bc = await db.BoatCategories.FindAsync(boatCategoryId);
@@ -1656,26 +1656,21 @@ admin.MapPost("/boat-categories/{boatCategoryId:guid}/boats/{boatId:guid}", asyn
     var boat = await db.Boats.FindAsync(boatId);
     if (boat is null) return Results.NotFound(new { message = "Boat not found" });
 
-    // Check if relationship already exists
-    var exists = await db.BoatBoatCategories
-        .AnyAsync(bbc => bbc.BoatId == boatId && bbc.BoatCategoryId == boatCategoryId);
-
-    if (exists) return Results.BadRequest(new { message = "Boat is already in this category" });
-
-    db.BoatBoatCategories.Add(new BoatBoatCategory { BoatId = boatId, BoatCategoryId = boatCategoryId });
+    boat.BoatCategoryId = boatCategoryId;
     await db.SaveChangesAsync();
     return Results.Created($"/admin/boat-categories/{boatCategoryId}", new { message = "Boat added to category" });
 });
 
-// Remove boat from boat category
+// Remove boat from boat category (clears boat.boat_category_id)
 admin.MapDelete("/boat-categories/{boatCategoryId:guid}/boats/{boatId:guid}", async (Guid boatCategoryId, Guid boatId, AppDb db) =>
 {
-    var bbc = await db.BoatBoatCategories
-        .FirstOrDefaultAsync(x => x.BoatId == boatId && x.BoatCategoryId == boatCategoryId);
+    var boat = await db.Boats.FindAsync(boatId);
+    if (boat is null) return Results.NotFound();
 
-    if (bbc is null) return Results.NotFound();
+    if (boat.BoatCategoryId != boatCategoryId)
+        return Results.BadRequest(new { message = "Boat is not in this category" });
 
-    db.BoatBoatCategories.Remove(bbc);
+    boat.BoatCategoryId = null;
     await db.SaveChangesAsync();
     return Results.NoContent();
 });
@@ -1683,23 +1678,25 @@ admin.MapDelete("/boat-categories/{boatCategoryId:guid}/boats/{boatId:guid}", as
 // Get boats in a boat category
 admin.MapGet("/boat-categories/{boatCategoryId:guid}/boats", async (Guid boatCategoryId, AppDb db) =>
 {
-    var boats = await db.BoatBoatCategories
-        .Where(bbc => bbc.BoatCategoryId == boatCategoryId)
-        .Include(bbc => bbc.Boat)
-        .Select(bbc => bbc.Boat)
+    var boats = await db.Boats
+        .Where(b => b.BoatCategoryId == boatCategoryId)
         .OrderBy(b => b.Name)
         .ToListAsync();
 
     return Results.Ok(new { boats });
 });
 
-admin.MapGet("/boat/{boatId:guid}/category", async (Guid boatId, AppDb db) =>
-    Results.Ok(await db.Categories.Where(c => c.BoatId == boatId).OrderBy(c => c.SortOrder).ToListAsync()));
+admin.MapGet("/boat/{boatId:guid}/boat-category", async (Guid boatId, AppDb db) =>
+{
+    var boat = await db.Boats.FindAsync(boatId);
+    if (boat is null) return Results.NotFound();
+    return Results.Ok(boat.BoatCategoryId);
+});
 
 // Create category
 admin.MapPost("/category", async (CategoryUpsert dto, AppDb db) =>
 {
-    var c = new Category { Id = Guid.NewGuid(), GroupId = dto.GroupId, BoatId = dto.BoatId, Name = dto.Name, SortOrder = dto.SortOrder, IsRequired = dto.IsRequired };
+    var c = new Category { Id = Guid.NewGuid(), GroupId = dto.GroupId, Name = dto.Name, SortOrder = dto.SortOrder, IsRequired = dto.IsRequired };
     db.Categories.Add(c);
     await db.SaveChangesAsync();
     return Results.Created($"/admin/category/{c.Id}", c);
@@ -1716,8 +1713,6 @@ admin.MapPatch("/category/{id:guid}", async (Guid id, CategoryUpsert dto, AppDb 
         c.Name = dto.Name;
     if (dto.GroupId != Guid.Empty)
         c.GroupId = dto.GroupId;
-    if (dto.BoatId.HasValue)
-        c.BoatId = dto.BoatId;
     c.SortOrder = dto.SortOrder;
     c.IsRequired = dto.IsRequired;
 

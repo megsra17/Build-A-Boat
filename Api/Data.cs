@@ -38,7 +38,6 @@ public class AppDb : DbContext
     public DbSet<Media> Media => Set<Media>();
     public DbSet<BoatLayerMedia> BoatLayerMedias => Set<BoatLayerMedia>();
     public DbSet<BoatCategory> BoatCategories => Set<BoatCategory>();
-    public DbSet<BoatBoatCategory> BoatBoatCategories => Set<BoatBoatCategory>();
 
     public DbSet<AppSettings> Settings => Set<AppSettings>();
 
@@ -91,6 +90,7 @@ public class AppDb : DbContext
         b.Entity<Boat>().Property(x => x.SecondaryImageUrl).HasColumnName("secondary_image_url");
         b.Entity<Boat>().Property(x => x.SideImageUrl).HasColumnName("side_image_url");
         b.Entity<Boat>().Property(x => x.LogoImageUrl).HasColumnName("logo_image_url");
+        b.Entity<Boat>().Property(x => x.BoatCategoryId).HasColumnName("boat_category_id");
         b.Entity<Group>().ToTable("group");
         b.Entity<Group>().Property(x => x.Id).HasColumnName("id");
         b.Entity<Group>().Property(x => x.BoatId).HasColumnName("boat_id");
@@ -99,7 +99,6 @@ public class AppDb : DbContext
         b.Entity<Category>().ToTable("category");
         b.Entity<Category>().Property(x => x.Id).HasColumnName("id");
         b.Entity<Category>().Property(x => x.GroupId).HasColumnName("group_id");
-        b.Entity<Category>().Property(x => x.BoatId).HasColumnName("boat_id");
         b.Entity<Category>().Property(x => x.Name).HasColumnName("name");
         b.Entity<Category>().Property(x => x.SortOrder).HasColumnName("sort_order");
         b.Entity<Category>().Property(x => x.IsRequired).HasColumnName("is_required");
@@ -139,8 +138,9 @@ public class AppDb : DbContext
 
         // Optional indexes/relationships
         b.Entity<Boat>().HasIndex(x => x.Slug).IsUnique();
+        b.Entity<Boat>().HasOne(x => x.BoatCategory).WithMany(x => x.Boats).HasForeignKey(x => x.BoatCategoryId);
         b.Entity<Group>().HasOne(x => x.Boat).WithMany(x => x.Groups).HasForeignKey(x => x.BoatId);
-        b.Entity<Category>().HasOne(x => x.Group).WithMany(x => x.Categories).HasForeignKey(x => x.GroupId);
+        b.Entity<Category>().HasOne(x => x.Group).WithMany(x => x.Categories).HasForeignKey(x => x.GroupId).IsRequired(false);
         b.Entity<OptionGroup>().HasOne(x => x.Category).WithMany(x => x.OptionsGroups).HasForeignKey(x => x.CategoryId);
         b.Entity<Option>().HasOne(x => x.OptionGroup).WithMany(x => x.Options).HasForeignKey(x => x.OptionGroupId);
 
@@ -192,9 +192,10 @@ public class Boat
     public string? SecondaryImageUrl { get; set; }
     public string? SideImageUrl { get; set; }
     public string? LogoImageUrl { get; set; }
+    public Guid? BoatCategoryId { get; set; }
+    public BoatCategory? BoatCategory { get; set; }
     public ICollection<Group> Groups { get; set; } = new List<Group>();
     public ICollection<Category> Categories { get; set; } = new List<Category>();
-    public ICollection<BoatBoatCategory> BoatBoatCategories { get; set; } = new List<BoatBoatCategory>();
 }
 
 public class BoatCategory
@@ -202,15 +203,7 @@ public class BoatCategory
     public Guid Id { get; set; }
     public string Name { get; set; } = "";
     public int SortOrder { get; set; }
-    public ICollection<BoatBoatCategory> BoatBoatCategories { get; set; } = new List<BoatBoatCategory>();
-}
-
-public class BoatBoatCategory
-{
-    public Guid BoatId { get; set; }
-    public Boat Boat { get; set; } = default!;
-    public Guid BoatCategoryId { get; set; }
-    public BoatCategory BoatCategory { get; set; } = default!;
+    public ICollection<Boat> Boats { get; set; } = new List<Boat>();
 }
 
 public class Group
@@ -228,8 +221,6 @@ public class Category
     public Guid Id { get; set; }
     public Guid? GroupId { get; set; }
     public Group? Group { get; set; }
-    public Guid? BoatId { get; set; }
-    public Boat? Boat { get; set; }
     public string Name { get; set; } = "";
     public int SortOrder { get; set; }
     public bool IsRequired { get; set; }
