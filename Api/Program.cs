@@ -152,12 +152,14 @@ var app = builder.Build();
 // Apply database migrations
 try
 {
+    Console.WriteLine("=== STARTING DATABASE MIGRATIONS ===");
     using (var scope = app.Services.CreateScope())
     {
         var db = scope.ServiceProvider.GetRequiredService<AppDb>();
 
         var connection = db.Database.GetDbConnection();
         await connection.OpenAsync();
+        Console.WriteLine("✓ Database connection opened successfully");
 
         // Check if group table exists, if not create it
         using (var command = connection.CreateCommand())
@@ -364,11 +366,14 @@ try
         }
 
         await connection.CloseAsync();
+        Console.WriteLine("✓ Database connection closed");
     }
+    Console.WriteLine("=== DATABASE MIGRATIONS COMPLETED SUCCESSFULLY ===");
 }
 catch (Exception ex)
 {
-    Console.WriteLine($"Migration error: {ex.Message}");
+    Console.WriteLine($"❌ Migration error: {ex.Message}");
+    Console.WriteLine($"Stack trace: {ex.StackTrace}");
 }
 
 // Global exception handling
@@ -1710,6 +1715,7 @@ admin.MapGet("/boat/{boatId:guid}/groups", async (Guid boatId, AppDb db) =>
 {
     try
     {
+        Console.WriteLine($"[GROUPS] Fetching groups for boat: {boatId}");
         var connection = db.Database.GetDbConnection();
         await connection.OpenAsync();
 
@@ -1726,12 +1732,22 @@ admin.MapGet("/boat/{boatId:guid}/groups", async (Guid boatId, AppDb db) =>
                 param.Value = boatId;
                 cmd.Parameters.Add(param);
 
-                using var reader = await cmd.ExecuteReaderAsync();
-                while (await reader.ReadAsync())
+                try
                 {
-                    var groupId = reader.GetGuid(0);
-                    var categories = await LoadCategoriesForGroup(connection, groupId);
-                    groups.Add(new GroupDetailDto(groupId, reader.GetGuid(1), reader.GetString(2), reader.GetInt32(3), categories));
+                    using var reader = await cmd.ExecuteReaderAsync();
+                    while (await reader.ReadAsync())
+                    {
+                        var groupId = reader.GetGuid(0);
+                        var categories = await LoadCategoriesForGroup(connection, groupId);
+                        groups.Add(new GroupDetailDto(groupId, reader.GetGuid(1), reader.GetString(2), reader.GetInt32(3), categories));
+                    }
+                    Console.WriteLine($"[GROUPS] ✓ Found {groups.Count} groups for boat {boatId}");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[GROUPS] ❌ Error executing groups query: {ex.Message}");
+                    Console.WriteLine($"[GROUPS] SQL: {cmd.CommandText}");
+                    throw;
                 }
             }
 
@@ -1744,6 +1760,8 @@ admin.MapGet("/boat/{boatId:guid}/groups", async (Guid boatId, AppDb db) =>
     }
     catch (Exception ex)
     {
+        Console.WriteLine($"[GROUPS] ❌ Fatal error: {ex.Message}");
+        Console.WriteLine($"[GROUPS] Stack trace: {ex.StackTrace}");
         return Results.Problem($"Error fetching groups: {ex.Message}");
     }
 
@@ -1759,12 +1777,21 @@ admin.MapGet("/boat/{boatId:guid}/groups", async (Guid boatId, AppDb db) =>
             param.Value = groupId;
             cmd.Parameters.Add(param);
 
-            using var reader = await cmd.ExecuteReaderAsync();
-            while (await reader.ReadAsync())
+            try
             {
-                var categoryId = reader.GetGuid(0);
-                var optionGroups = await LoadOptionGroupsForCategory(conn, categoryId);
-                categories.Add(new CategoryDetailDto(categoryId, groupId, reader.GetString(2), reader.GetInt32(3), reader.GetBoolean(4), optionGroups));
+                using var reader = await cmd.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                {
+                    var categoryId = reader.GetGuid(0);
+                    var optionGroups = await LoadOptionGroupsForCategory(conn, categoryId);
+                    categories.Add(new CategoryDetailDto(categoryId, groupId, reader.GetString(2), reader.GetInt32(3), reader.GetBoolean(4), optionGroups));
+                }
+                Console.WriteLine($"[GROUPS] ✓ Loaded {categories.Count} categories for group {groupId}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[GROUPS] ❌ Error loading categories for group {groupId}: {ex.Message}");
+                throw;
             }
         }
 
