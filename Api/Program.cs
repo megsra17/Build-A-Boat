@@ -2365,23 +2365,60 @@ admin.MapPatch("/options/{id:guid}", async (Guid id, OptionUpsert dto, AppDb db)
                         is_active = @isActive, sort_order = @sortOrder
                     WHERE id = @id";
 
-                cmd.Parameters.Add(CreateParameter(cmd, "@id", id));
-                cmd.Parameters.Add(CreateParameter(cmd, "@ogId", dto.OptionGroupId));
-                cmd.Parameters.Add(CreateParameter(cmd, "@sku", dto.Sku));
-                cmd.Parameters.Add(CreateParameter(cmd, "@label", dto.Label));
-                cmd.Parameters.Add(CreateParameter(cmd, "@desc", dto.Description));
-                cmd.Parameters.Add(CreateParameter(cmd, "@price", dto.PriceDelta));
-                cmd.Parameters.Add(CreateParameter(cmd, "@imageUrl", dto.ImageUrl));
-                cmd.Parameters.Add(CreateParameter(cmd, "@isDefault", dto.IsDefault));
-                cmd.Parameters.Add(CreateParameter(cmd, "@isActive", dto.IsActive));
-                cmd.Parameters.Add(CreateParameter(cmd, "@sortOrder", dto.SortOrder));
+                var p = cmd.CreateParameter();
+                p.ParameterName = "@id";
+                p.Value = id;
+                cmd.Parameters.Add(p);
+
+                p = cmd.CreateParameter();
+                p.ParameterName = "@ogId";
+                p.Value = dto.OptionGroupId;
+                cmd.Parameters.Add(p);
+
+                p = cmd.CreateParameter();
+                p.ParameterName = "@sku";
+                p.Value = dto.Sku ?? (object)DBNull.Value;
+                cmd.Parameters.Add(p);
+
+                p = cmd.CreateParameter();
+                p.ParameterName = "@label";
+                p.Value = dto.Label;
+                cmd.Parameters.Add(p);
+
+                p = cmd.CreateParameter();
+                p.ParameterName = "@desc";
+                p.Value = dto.Description ?? (object)DBNull.Value;
+                cmd.Parameters.Add(p);
+
+                p = cmd.CreateParameter();
+                p.ParameterName = "@price";
+                p.Value = dto.PriceDelta;
+                cmd.Parameters.Add(p);
+
+                p = cmd.CreateParameter();
+                p.ParameterName = "@imageUrl";
+                p.Value = dto.ImageUrl ?? (object)DBNull.Value;
+                cmd.Parameters.Add(p);
+
+                p = cmd.CreateParameter();
+                p.ParameterName = "@isDefault";
+                p.Value = dto.IsDefault;
+                cmd.Parameters.Add(p);
+
+                p = cmd.CreateParameter();
+                p.ParameterName = "@isActive";
+                p.Value = dto.IsActive;
+                cmd.Parameters.Add(p);
+
+                p = cmd.CreateParameter();
+                p.ParameterName = "@sortOrder";
+                p.Value = dto.SortOrder;
+                cmd.Parameters.Add(p);
 
                 var rowsAffected = await cmd.ExecuteNonQueryAsync();
                 if (rowsAffected == 0)
                     return Results.NotFound();
             }
-
-            await connection.CloseAsync();
 
             return Results.Ok(new { id, optionGroupId = dto.OptionGroupId, sku = dto.Sku, label = dto.Label, description = dto.Description, price = dto.PriceDelta, imageUrl = dto.ImageUrl, isDefault = dto.IsDefault, isActive = dto.IsActive, sortOrder = dto.SortOrder });
         }
@@ -2394,14 +2431,6 @@ admin.MapPatch("/options/{id:guid}", async (Guid id, OptionUpsert dto, AppDb db)
     {
         Console.WriteLine($"Error updating option: {ex.Message}");
         return Results.Problem($"Error updating option: {ex.Message}");
-    }
-
-    System.Data.Common.DbParameter CreateParameter(System.Data.Common.DbCommand cmd, string name, object? value)
-    {
-        var param = cmd.CreateParameter();
-        param.ParameterName = name;
-        param.Value = value ?? (object)DBNull.Value;
-        return param;
     }
 });
 
