@@ -260,6 +260,54 @@ try
             }
         }
 
+        // Check if boat_category_id column exists in boat table, if not add it
+        using (var command = connection.CreateCommand())
+        {
+            command.CommandText = @"
+                SELECT EXISTS (
+                    SELECT 1 FROM information_schema.columns 
+                    WHERE table_name = 'boat' AND column_name = 'boat_category_id'
+                )";
+            var result = await command.ExecuteScalarAsync();
+            if (result is false)
+            {
+                Console.WriteLine("Adding boat_category_id column to boat table...");
+
+                // Add the column as nullable
+                command.CommandText = @"
+                    ALTER TABLE boat 
+                    ADD COLUMN boat_category_id uuid NULL;";
+                await command.ExecuteNonQueryAsync();
+
+                // Add foreign key constraint
+                command.CommandText = @"
+                    ALTER TABLE boat 
+                    ADD CONSTRAINT fk_boat_boat_category_id 
+                    FOREIGN KEY (boat_category_id) REFERENCES boat_category (id) ON DELETE SET NULL;";
+                await command.ExecuteNonQueryAsync();
+
+                Console.WriteLine("Migration completed: boat_category_id column added to boat table");
+            }
+        }
+
+        // Drop boat_boat_category table if it exists (migration from old structure)
+        using (var command = connection.CreateCommand())
+        {
+            command.CommandText = @"
+                SELECT EXISTS (
+                    SELECT 1 FROM information_schema.tables 
+                    WHERE table_name = 'boat_boat_category'
+                )";
+            var result = await command.ExecuteScalarAsync();
+            if (result is true)
+            {
+                Console.WriteLine("Dropping old boat_boat_category junction table...");
+                command.CommandText = @"DROP TABLE IF EXISTS boat_boat_category CASCADE;";
+                await command.ExecuteNonQueryAsync();
+                Console.WriteLine("Old boat_boat_category table dropped successfully");
+            }
+        }
+
         await connection.CloseAsync();
     }
 }

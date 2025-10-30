@@ -14,6 +14,7 @@ type Boat = {
   name: string;
   basePrice: number;
   isActive: boolean;
+  boatCategoryId?: string | null;
   categoryId?: string | null;
   categoryName?: string;
   msrp?: number | null;
@@ -71,7 +72,6 @@ export default function BoatTopSection({
   const [modelYear, setModelYear] = useState(boat.modelYear ?? new Date().getFullYear());
   const [name, setName] = useState(boat.name ?? "");
   const [basePrice, setBasePrice] = useState(boat.basePrice ?? 0);
-  const [boatCategories, setBoatCategories] = useState<BoatCategory[]>([]);
   const [allBoatCategories, setAllBoatCategories] = useState<BoatCategory[]>([]);
   const [selectedBoatCategoryId, setSelectedBoatCategoryId] = useState<string>("");
 
@@ -81,7 +81,7 @@ export default function BoatTopSection({
   const [logo, setLogo] = useState(boat.graphicLogoUrl ?? "");
 
   useEffect(() => {
-    // Fetch all boat categories and determine which ones this boat belongs to
+    // Fetch all boat categories
     (async () => {
       try {
         const jwt = typeof window !== 'undefined' ? (localStorage.getItem("jwt") || sessionStorage.getItem("jwt")) : null;
@@ -96,27 +96,16 @@ export default function BoatTopSection({
           const allCats = data?.items || [];
           setAllBoatCategories(allCats);
           
-          // For each category, check if this boat is in it
-          const boatsInCategories: BoatCategory[] = [];
-          for (const cat of allCats) {
-            const boatsRes = await fetch(`${apiUrl}/admin/boat-categories/${cat.id}/boats`, {
-              headers: jwt ? { Authorization: `Bearer ${jwt}` } : {},
-            });
-            if (boatsRes.ok) {
-              const boatsData = await boatsRes.json();
-              const boats = boatsData?.boats || [];
-              if (boats.some((b: Boat) => b.id === boat.id)) {
-                boatsInCategories.push(cat);
-              }
-            }
+          // Set the selected category based on boat's boatCategoryId
+          if (boat.boatCategoryId) {
+            setSelectedBoatCategoryId(boat.boatCategoryId);
           }
-          setBoatCategories(boatsInCategories);
         }
       } catch (e) {
         console.error("Failed to fetch boat categories:", e);
       }
     })();
-  }, [boat.id]);
+  }, [boat.id, boat.boatCategoryId]);
 
   function enterEdit() {
     // seed form from current boat (safe if user cancelled previously)
@@ -127,82 +116,52 @@ export default function BoatTopSection({
     setSecondary(boat.secondaryImageUrl ?? "");
     setSide(boat.sideImageUrl ?? "");
     setLogo(boat.graphicLogoUrl ?? "");
-    setSelectedBoatCategoryId("");
+    setSelectedBoatCategoryId(boat.boatCategoryId ?? "");
     setErr(null);
     setEditing(true);
   }
 
-  async function addBoatToCategory() {
-    if (!selectedBoatCategoryId) return;
-    
-    // Check if already assigned
-    if (boatCategories.some(c => c.id === selectedBoatCategoryId)) {
-      setErr("This boat is already in that category");
-      return;
-    }
-    
+  async function updateBoatCategory(newCategoryId: string | null) {
     try {
       setBusy(true);
       setErr(null);
       const jwt = typeof window !== 'undefined' ? (localStorage.getItem("jwt") || sessionStorage.getItem("jwt")) : null;
       const apiUrl = getApiBase();
-      const headers: Record<string, string> = {};
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
       if (jwt) {
         headers["Authorization"] = `Bearer ${jwt}`;
       }
       
-      // Add boat to the selected BoatCategory
-      const res = await fetch(`${apiUrl}/admin/boat-categories/${selectedBoatCategoryId}/boats/${boat.id}`, {
-        method: "POST",
-        headers,
-      });
-      
-      if (res.ok) {
-        // Find the category object from allBoatCategories
-        const categoryToAdd = allBoatCategories.find(c => c.id === selectedBoatCategoryId);
-        if (categoryToAdd) {
-          setBoatCategories([...boatCategories, categoryToAdd]);
+      if (newCategoryId) {
+        // Assign boat to the new category
+        const res = await fetch(`${apiUrl}/admin/boat-categories/${newCategoryId}/boats/${boat.id}`, {
+          method: "POST",
+          headers,
+        });
+        
+        if (!res.ok) {
+          const errorText = await res.text();
+          throw new Error(errorText || `HTTP ${res.status}`);
         }
-        setSelectedBoatCategoryId("");
-      } else {
-        const errorText = await res.text();
-        console.error("Failed to add boat to category:", errorText);
-        throw new Error(errorText || `HTTP ${res.status}`);
-      }
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "Failed to add boat to category";
-      console.error(msg);
-      setErr(msg);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function removeBoatFromCategory(categoryId: string) {
-    try {
-      setBusy(true);
-      setErr(null);
-      const jwt = typeof window !== 'undefined' ? (localStorage.getItem("jwt") || sessionStorage.getItem("jwt")) : null;
-      const apiUrl = getApiBase();
-      const headers: Record<string, string> = {};
-      if (jwt) {
-        headers["Authorization"] = `Bearer ${jwt}`;
+      } else if (boat.boatCategoryId) {
+        // Remove boat from current category (if it had one)
+        const res = await fetch(`${apiUrl}/admin/boat-categories/${boat.boatCategoryId}/boats/${boat.id}`, {
+          method: "DELETE",
+          headers,
+        });
+        
+        if (!res.ok) {
+          const errorText = await res.text();
+          throw new Error(errorText || `HTTP ${res.status}`);
+        }
       }
       
-      const res = await fetch(`${apiUrl}/admin/boat-categories/${categoryId}/boats/${boat.id}`, {
-        method: "DELETE",
-        headers,
-      });
-      
-      if (res.ok) {
-        setBoatCategories(boatCategories.filter(c => c.id !== categoryId));
-      } else {
-        const errorText = await res.text();
-        console.error("Failed to remove boat from category:", errorText);
-        throw new Error(errorText || `HTTP ${res.status}`);
-      }
+      // Update local state and notify parent
+      const updated = { ...boat, boatCategoryId: newCategoryId || undefined };
+      setSelectedBoatCategoryId(newCategoryId ?? "");
+      if (onUpdated) onUpdated(updated);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Failed to remove boat from category";
+      const msg = e instanceof Error ? e.message : "Failed to update boat category";
       console.error(msg);
       setErr(msg);
     } finally {
@@ -232,18 +191,6 @@ export default function BoatTopSection({
       };
       
       const updated = await BoatsApi.update(boat.id, payload);
-      
-      // Refetch categories to ensure they're up to date
-      const jwt = typeof window !== 'undefined' ? (localStorage.getItem("jwt") || sessionStorage.getItem("jwt")) : null;
-      const apiUrl = getApiBase();
-      const catRes = await fetch(`${apiUrl}/admin/boat/${boat.id}/category`, {
-        headers: jwt ? { Authorization: `Bearer ${jwt}` } : {},
-      });
-      if (catRes.ok) {
-        const cats = await catRes.json();
-        const catList = Array.isArray(cats) ? cats : cats?.items || [];
-        setBoatCategories(catList);
-      }
       
       onUpdated?.(updated);
       setEditing(false);
@@ -291,8 +238,8 @@ export default function BoatTopSection({
             <dt className="text-white/50">MSRP:</dt><dd>${boat.basePrice?.toLocaleString() ?? "—"}</dd>
             <dt className="text-white/50">Categories:</dt>
             <dd>
-              {Array.isArray(boatCategories) && boatCategories.length > 0
-                ? boatCategories.map((c: Category) => c.name).join(", ")
+              {boat.boatCategoryId && allBoatCategories.length > 0
+                ? allBoatCategories.find(c => c.id === boat.boatCategoryId)?.name ?? "—"
                 : "—"}
             </dd>
           </dl>
@@ -361,53 +308,28 @@ export default function BoatTopSection({
 
       {/* Boat Categories management */}
       <div className="mt-8 pt-6 border-t border-white/10">
-        <h3 className="text-lg font-medium text-white/90 mb-4">Boat Categories</h3>
+        <h3 className="text-lg font-medium text-white/90 mb-4">Boat Category</h3>
         
-        {/* Display categories this boat belongs to */}
-        {boatCategories.length > 0 && (
-          <div className="mb-4">
-            <div className="space-y-2">
-              {boatCategories.map((cat: BoatCategory) => (
-                <div key={cat.id} className="flex items-center justify-between bg-black/30 rounded px-3 py-2 border border-white/10">
-                  <span className="text-white/80">{cat.name}</span>
-                  <button
-                    type="button"
-                    onClick={() => removeBoatFromCategory(cat.id)}
-                    disabled={busy}
-                    className="text-red-400 hover:text-red-300 text-sm px-2 py-1 rounded hover:bg-red-900/20 transition"
-                  >
-                    Remove
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-        
-        {/* Add boat to a category */}
+        {/* Dropdown to select/change boat category */}
         {allBoatCategories.length > 0 && (
-          <div className="flex gap-2">
+          <div>
             <select
               value={selectedBoatCategoryId}
-              onChange={e => setSelectedBoatCategoryId(e.target.value)}
-              className="flex-1 bg-black/50 border-b border-white/30 focus:border-white/70 outline-none py-1 text-white"
+              onChange={e => updateBoatCategory(e.target.value || null)}
+              disabled={busy}
+              className="w-full bg-black/50 border-b border-white/30 focus:border-white/70 outline-none py-1 text-white disabled:opacity-50"
             >
-              <option value="">Select a boat category to add...</option>
+              <option value="">-- None --</option>
               {allBoatCategories.map(cat => (
-                <option key={cat.id} value={cat.id} disabled={boatCategories.some(bc => bc.id === cat.id)}>
-                  {cat.name} {boatCategories.some(bc => bc.id === cat.id) ? "(already added)" : ""}
+                <option key={cat.id} value={cat.id}>
+                  {cat.name}
                 </option>
               ))}
             </select>
-            <button
-              type="button"
-              onClick={addBoatToCategory}
-              disabled={busy || !selectedBoatCategoryId}
-              className="px-4 py-1 rounded bg-yellow-600/40 text-yellow-300 hover:bg-yellow-600/60 disabled:opacity-50 disabled:cursor-not-allowed text-sm transition"
-            >
-              Add
-            </button>
           </div>
+        )}
+        {allBoatCategories.length === 0 && (
+          <p className="text-white/50 text-sm">No boat categories available. Create one in the Categories section.</p>
         )}
       </div>
 
