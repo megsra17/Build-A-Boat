@@ -7,6 +7,7 @@ type RenameDialogState = {
   type: "group" | "category" | "option" | null;
   id: string;
   groupId?: string;
+  categoryId?: string;
   currentName: string;
 };
 
@@ -367,8 +368,8 @@ export default function Configurations({
     }
   }
 
-  function openRenameDialog(type: "group" | "category" | "option", id: string, currentName: string, groupId?: string) {
-    setRenameDialog({ isOpen: true, type, id, currentName, groupId });
+  function openRenameDialog(type: "group" | "category" | "option", id: string, currentName: string, groupId?: string, categoryId?: string) {
+    setRenameDialog({ isOpen: true, type, id, currentName, groupId, categoryId });
     setRenameName(currentName);
   }
 
@@ -385,13 +386,10 @@ export default function Configurations({
         await renameGroup(renameDialog.id, renameName.trim());
       } else if (renameDialog.type === "category" && renameDialog.groupId) {
         await renameCategory(renameDialog.groupId, renameDialog.id, renameName.trim());
-      } else if (renameDialog.type === "option" && renameDialog.groupId) {
+      } else if (renameDialog.type === "option" && renameDialog.groupId && renameDialog.categoryId) {
         // For options, we just update locally since they're not saved to DB yet
-        const parts = renameDialog.id.split("|");
-        if (parts.length === 2) {
-          renameOption(renameDialog.groupId, parts[0], parts[1], renameName.trim());
-          closeRenameDialog();
-        }
+        renameOption(renameDialog.groupId, renameDialog.categoryId, renameDialog.id, renameName.trim());
+        closeRenameDialog();
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Failed to rename";
@@ -548,16 +546,51 @@ export default function Configurations({
 
                     {!cat.collapsed && (
                       <ul className="mt-3 space-y-2">
-                        {cat.options.map(opt => (
-                          <li key={opt.id} className="flex items-center justify-between rounded bg-black/20 px-3 py-2 border border-white/10">
+                        {cat.options.map((opt, idx) => (
+                          <li 
+                            key={opt.id} 
+                            draggable
+                            onDragStart={() => setDraggedGroupId(`opt|${selected.id}|${cat.id}|${idx}`)}
+                            onDragOver={(e) => {
+                              e.preventDefault();
+                              e.currentTarget.classList.add("bg-white/10");
+                            }}
+                            onDragLeave={(e) => {
+                              e.currentTarget.classList.remove("bg-white/10");
+                            }}
+                            onDrop={(e) => {
+                              e.currentTarget.classList.remove("bg-white/10");
+                              const dragData = draggedGroupId;
+                              if (dragData && dragData.startsWith("opt|")) {
+                                const parts = dragData.split("|");
+                                if (parts.length === 4) {
+                                  const [, dragGroupId, dragCatId, dragIdx] = parts;
+                                  const dragIndex = parseInt(dragIdx);
+                                  if (dragGroupId === selected.id && dragCatId === cat.id && dragIndex !== idx) {
+                                    updateCfg(c => {
+                                      const g = c.groups.find(x => x.id === dragGroupId);
+                                      if (g) {
+                                        const cat = g.categories.find(x => x.id === dragCatId);
+                                        if (cat && cat.options) {
+                                          const [removed] = cat.options.splice(dragIndex, 1);
+                                          cat.options.splice(idx, 0, removed);
+                                        }
+                                      }
+                                    });
+                                  }
+                                }
+                              }
+                              setDraggedGroupId(null);
+                            }}
+                            className="flex items-center justify-between rounded bg-black/20 px-3 py-2 border border-white/10 cursor-move transition-colors hover:bg-white/5"
+                          >
                             <div className="flex items-center gap-2">
                               <GripVertical className="size-4 opacity-50" />
                               <span>{opt.name}</span>
                             </div>
                             <div className="flex items-center gap-2">
                               <button onClick={() => {
-                                const name = prompt("Rename option", opt.name);
-                                if (name) renameOption(selected.id, cat.id, opt.id, name);
+                                openRenameDialog("option", opt.id, opt.name, selected.id, cat.id);
                               }} title="Rename" className="icon-btn">
                                 <Pencil className="size-4"/>
                               </button>
