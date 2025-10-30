@@ -6,6 +6,7 @@ import FolderBrowser from "@/app/components/FolderBrowser";
 
 // Adjust to your types
 type Category = { id: string; name: string };
+type BoatCategory = { id: string; name: string; sortOrder: number };
 type Boat = {
   id: string;
   slug: string;
@@ -70,8 +71,9 @@ export default function BoatTopSection({
   const [modelYear, setModelYear] = useState(boat.modelYear ?? new Date().getFullYear());
   const [name, setName] = useState(boat.name ?? "");
   const [basePrice, setBasePrice] = useState(boat.basePrice ?? 0);
-  const [boatCategories, setBoatCategories] = useState<Category[]>([]);
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string>("");
+  const [boatCategories, setBoatCategories] = useState<BoatCategory[]>([]);
+  const [allBoatCategories, setAllBoatCategories] = useState<BoatCategory[]>([]);
+  const [selectedBoatCategoryId, setSelectedBoatCategoryId] = useState<string>("");
 
   const [primary, setPrimary] = useState(boat.primaryImageUrl ?? "");
   const [secondary, setSecondary] = useState(boat.secondaryImageUrl ?? "");
@@ -79,20 +81,39 @@ export default function BoatTopSection({
   const [logo, setLogo] = useState(boat.graphicLogoUrl ?? "");
 
   useEffect(() => {
-    // Fetch boat's categories when component mounts
+    // Fetch all boat categories and determine which ones this boat belongs to
     (async () => {
       try {
         const jwt = typeof window !== 'undefined' ? (localStorage.getItem("jwt") || sessionStorage.getItem("jwt")) : null;
         const apiUrl = getApiBase();
-        const res = await fetch(`${apiUrl}/admin/boat/${boat.id}/category`, {
+        
+        // Get all boat categories
+        const allRes = await fetch(`${apiUrl}/admin/boat-categories`, {
           headers: jwt ? { Authorization: `Bearer ${jwt}` } : {},
         });
-        if (res.ok) {
-          const cats = await res.json();
-          setBoatCategories(Array.isArray(cats) ? cats : cats?.items || []);
+        if (allRes.ok) {
+          const data = await allRes.json();
+          const allCats = data?.items || [];
+          setAllBoatCategories(allCats);
+          
+          // For each category, check if this boat is in it
+          const boatsInCategories: BoatCategory[] = [];
+          for (const cat of allCats) {
+            const boatsRes = await fetch(`${apiUrl}/admin/boat-categories/${cat.id}/boats`, {
+              headers: jwt ? { Authorization: `Bearer ${jwt}` } : {},
+            });
+            if (boatsRes.ok) {
+              const boatsData = await boatsRes.json();
+              const boats = boatsData?.boats || [];
+              if (boats.some((b: Boat) => b.id === boat.id)) {
+                boatsInCategories.push(cat);
+              }
+            }
+          }
+          setBoatCategories(boatsInCategories);
         }
       } catch (e) {
-        console.error("Failed to fetch categories:", e);
+        console.error("Failed to fetch boat categories:", e);
       }
     })();
   }, [boat.id]);
@@ -106,67 +127,23 @@ export default function BoatTopSection({
     setSecondary(boat.secondaryImageUrl ?? "");
     setSide(boat.sideImageUrl ?? "");
     setLogo(boat.graphicLogoUrl ?? "");
-    setSelectedCategoryId("");
+    setSelectedBoatCategoryId("");
     setErr(null);
     setEditing(true);
   }
 
-  async function assignCategory() {
-    if (!selectedCategoryId) return;
+  async function addBoatToCategory() {
+    if (!selectedBoatCategoryId) return;
     
     // Check if already assigned
-    if (boatCategories.some(c => c.id === selectedCategoryId)) {
-      setErr("Category already assigned to this boat");
+    if (boatCategories.some(c => c.id === selectedBoatCategoryId)) {
+      setErr("This boat is already in that category");
       return;
     }
     
     try {
-      const jwt = typeof window !== 'undefined' ? (localStorage.getItem("jwt") || sessionStorage.getItem("jwt")) : null;
-      const apiUrl = getApiBase();
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
-      if (jwt) {
-        headers["Authorization"] = `Bearer ${jwt}`;
-      }
-      
-      // Find the category details from the available categories
-      const categoryToAssign = categories.find(c => c.id === selectedCategoryId);
-      if (!categoryToAssign) {
-        throw new Error("Category not found");
-      }
-      
-      // Create a new category record for this boat by updating the existing category
-      const payload = {
-        boatId: boat.id,
-        name: categoryToAssign.name,
-        sortOrder: boatCategories.length,
-        isRequired: false,
-      };
-      
-      
-      const res = await fetch(`${apiUrl}/admin/category`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify(payload),
-      });
-      
-      if (res.ok) {
-        const newCat = await res.json();
-        setBoatCategories([...boatCategories, newCat]);
-        setSelectedCategoryId("");
-      } else {
-        const errorText = await res.text();
-        console.error("Failed to assign category:", errorText);
-        throw new Error(errorText || `HTTP ${res.status}`);
-      }
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "Failed to assign category";
-      console.error(msg);
-      setErr(msg);
-    }
-  }
-
-  async function deleteCategory(categoryId: string) {
-    try {
+      setBusy(true);
+      setErr(null);
       const jwt = typeof window !== 'undefined' ? (localStorage.getItem("jwt") || sessionStorage.getItem("jwt")) : null;
       const apiUrl = getApiBase();
       const headers: Record<string, string> = {};
@@ -174,7 +151,45 @@ export default function BoatTopSection({
         headers["Authorization"] = `Bearer ${jwt}`;
       }
       
-      const res = await fetch(`${apiUrl}/admin/category/${categoryId}`, {
+      // Add boat to the selected BoatCategory
+      const res = await fetch(`${apiUrl}/admin/boat-categories/${selectedBoatCategoryId}/boats/${boat.id}`, {
+        method: "POST",
+        headers,
+      });
+      
+      if (res.ok) {
+        // Find the category object from allBoatCategories
+        const categoryToAdd = allBoatCategories.find(c => c.id === selectedBoatCategoryId);
+        if (categoryToAdd) {
+          setBoatCategories([...boatCategories, categoryToAdd]);
+        }
+        setSelectedBoatCategoryId("");
+      } else {
+        const errorText = await res.text();
+        console.error("Failed to add boat to category:", errorText);
+        throw new Error(errorText || `HTTP ${res.status}`);
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Failed to add boat to category";
+      console.error(msg);
+      setErr(msg);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function removeBoatFromCategory(categoryId: string) {
+    try {
+      setBusy(true);
+      setErr(null);
+      const jwt = typeof window !== 'undefined' ? (localStorage.getItem("jwt") || sessionStorage.getItem("jwt")) : null;
+      const apiUrl = getApiBase();
+      const headers: Record<string, string> = {};
+      if (jwt) {
+        headers["Authorization"] = `Bearer ${jwt}`;
+      }
+      
+      const res = await fetch(`${apiUrl}/admin/boat-categories/${categoryId}/boats/${boat.id}`, {
         method: "DELETE",
         headers,
       });
@@ -183,13 +198,15 @@ export default function BoatTopSection({
         setBoatCategories(boatCategories.filter(c => c.id !== categoryId));
       } else {
         const errorText = await res.text();
-        console.error("Failed to delete category:", errorText);
+        console.error("Failed to remove boat from category:", errorText);
         throw new Error(errorText || `HTTP ${res.status}`);
       }
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Failed to delete category";
+      const msg = e instanceof Error ? e.message : "Failed to remove boat from category";
       console.error(msg);
       setErr(msg);
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -342,20 +359,20 @@ export default function BoatTopSection({
         </Field>
       </div>
 
-      {/* Category management */}
+      {/* Boat Categories management */}
       <div className="mt-8 pt-6 border-t border-white/10">
-        <h3 className="text-lg font-medium text-white/90 mb-4">Categories</h3>
+        <h3 className="text-lg font-medium text-white/90 mb-4">Boat Categories</h3>
         
-        {/* Display existing categories */}
+        {/* Display categories this boat belongs to */}
         {boatCategories.length > 0 && (
           <div className="mb-4">
             <div className="space-y-2">
-              {boatCategories.map((cat: Category) => (
+              {boatCategories.map((cat: BoatCategory) => (
                 <div key={cat.id} className="flex items-center justify-between bg-black/30 rounded px-3 py-2 border border-white/10">
                   <span className="text-white/80">{cat.name}</span>
                   <button
                     type="button"
-                    onClick={() => deleteCategory(cat.id)}
+                    onClick={() => removeBoatFromCategory(cat.id)}
                     disabled={busy}
                     className="text-red-400 hover:text-red-300 text-sm px-2 py-1 rounded hover:bg-red-900/20 transition"
                   >
@@ -367,29 +384,31 @@ export default function BoatTopSection({
           </div>
         )}
         
-        {/* Assign existing category */}
-        <div className="flex gap-2">
-          <select
-            value={selectedCategoryId}
-            onChange={e => setSelectedCategoryId(e.target.value)}
-            className="flex-1 bg-black/50 border-b border-white/30 focus:border-white/70 outline-none py-1 text-white"
-          >
-            <option value="">Select a category to add...</option>
-            {categories.map(cat => (
-              <option key={cat.id} value={cat.id} disabled={boatCategories.some(bc => bc.id === cat.id)}>
-                {cat.name} {boatCategories.some(bc => bc.id === cat.id) ? "(already assigned)" : ""}
-              </option>
-            ))}
-          </select>
-          <button
-            type="button"
-            onClick={assignCategory}
-            disabled={busy || !selectedCategoryId}
-            className="px-4 py-1 rounded bg-yellow-600/40 text-yellow-300 hover:bg-yellow-600/60 disabled:opacity-50 disabled:cursor-not-allowed text-sm transition"
-          >
-            Add
-          </button>
-        </div>
+        {/* Add boat to a category */}
+        {allBoatCategories.length > 0 && (
+          <div className="flex gap-2">
+            <select
+              value={selectedBoatCategoryId}
+              onChange={e => setSelectedBoatCategoryId(e.target.value)}
+              className="flex-1 bg-black/50 border-b border-white/30 focus:border-white/70 outline-none py-1 text-white"
+            >
+              <option value="">Select a boat category to add...</option>
+              {allBoatCategories.map(cat => (
+                <option key={cat.id} value={cat.id} disabled={boatCategories.some(bc => bc.id === cat.id)}>
+                  {cat.name} {boatCategories.some(bc => bc.id === cat.id) ? "(already added)" : ""}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={addBoatToCategory}
+              disabled={busy || !selectedBoatCategoryId}
+              className="px-4 py-1 rounded bg-yellow-600/40 text-yellow-300 hover:bg-yellow-600/60 disabled:opacity-50 disabled:cursor-not-allowed text-sm transition"
+            >
+              Add
+            </button>
+          </div>
+        )}
       </div>
 
       {/* image pickers – only shown in edit mode */}

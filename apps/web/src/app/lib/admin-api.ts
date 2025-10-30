@@ -70,6 +70,12 @@ export type CategoryRow = {
   updatedAt: string;
 }
 
+export type BoatCategoryRow = {
+  id: string;
+  name: string;
+  sortOrder: number;
+}
+
 export type BoatSummary = {
   id: string;
   modelYear: number;
@@ -249,7 +255,7 @@ export const BoatsApi = {
 
 
 
-export const CategoriesApi = {
+export const BoatCategoriesApi = {
   async list(apts?: {search?: string}) {
     const p = new URLSearchParams();
     if(apts?.search) p.set("search", apts.search);
@@ -257,23 +263,62 @@ export const CategoriesApi = {
       headers: {"Content-Type":"application/json", ...authHeaders()},
       cache: "no-store",
     })
-    return j<{items:CategoryRow[]}>(res);
+    return j<{items:BoatCategoryRow[]}>(res);
   },
 
-  async create(body: { Name: string; BoatId: string;}) {
-    const res = await fetch(`${API}/admin/category`, {
+  async create(body: { Name: string; SortOrder: number }) {
+    const res = await fetch(`${API}/admin/boat-categories`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...authHeaders()},
       body: JSON.stringify(body),
     });
-    return j<CategoryRow>(res);
+    return j<BoatCategoryRow>(res);
+  },
+
+  async update(id: string, body: { Name: string; SortOrder: number }) {
+    const res = await fetch(`${API}/admin/boat-categories/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...authHeaders()},
+      body: JSON.stringify(body),
+    });
+    return j<BoatCategoryRow>(res);
   },
   
   async remove(id: string){
-    const res = await fetch(`${API}/admin/category/${id}`, { method: "DELETE", headers: { ...authHeaders() } });
+    const res = await fetch(`${API}/admin/boat-categories/${id}`, { method: "DELETE", headers: { ...authHeaders() } });
     if(!res.ok) {
       const text = await res.text();
-      throw new Error(`Failed to delete category: ${res.status} ${text}`);
+      throw new Error(`Failed to delete boat category: ${res.status} ${text}`);
     }
+  },
+
+  async addBoat(boatCategoryId: string, boatId: string) {
+    const res = await fetch(`${API}/admin/boat-categories/${boatCategoryId}/boats/${boatId}`, {
+      method: "POST",
+      headers: { ...authHeaders() },
+    });
+    if(!res.ok) {
+      const text = await res.text();
+      throw new Error(`Failed to add boat: ${res.status} ${text}`);
+    }
+  },
+
+  async removeBoat(boatCategoryId: string, boatId: string) {
+    const res = await fetch(`${API}/admin/boat-categories/${boatCategoryId}/boats/${boatId}`, {
+      method: "DELETE",
+      headers: { ...authHeaders() },
+    });
+    if(!res.ok) {
+      const text = await res.text();
+      throw new Error(`Failed to remove boat: ${res.status} ${text}`);
+    }
+  },
+
+  async getBoats(boatCategoryId: string) {
+    const res = await fetch(`${API}/admin/boat-categories/${boatCategoryId}/boats`, {
+      headers: { ...authHeaders() },
+      cache: "no-store",
+    });
+    return j<{boats: Boat[]}>(res);
   }
 }

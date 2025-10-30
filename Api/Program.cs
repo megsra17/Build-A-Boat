@@ -237,6 +237,52 @@ try
             }
         }
 
+        // Check if boat_category table exists, if not create it
+        using (var command = connection.CreateCommand())
+        {
+            command.CommandText = @"
+                SELECT EXISTS (
+                    SELECT 1 FROM information_schema.tables 
+                    WHERE table_name = 'boat_category'
+                )";
+            var result = await command.ExecuteScalarAsync();
+            if (result is false)
+            {
+                Console.WriteLine("Creating boat_category table...");
+                command.CommandText = @"
+                    CREATE TABLE boat_category (
+                        id uuid PRIMARY KEY,
+                        name varchar(255) NOT NULL,
+                        sort_order integer NOT NULL
+                    );";
+                await command.ExecuteNonQueryAsync();
+                Console.WriteLine("boat_category table created successfully");
+            }
+        }
+
+        // Check if boat_boat_category table exists, if not create it
+        using (var command = connection.CreateCommand())
+        {
+            command.CommandText = @"
+                SELECT EXISTS (
+                    SELECT 1 FROM information_schema.tables 
+                    WHERE table_name = 'boat_boat_category'
+                )";
+            var result = await command.ExecuteScalarAsync();
+            if (result is false)
+            {
+                Console.WriteLine("Creating boat_boat_category table...");
+                command.CommandText = @"
+                    CREATE TABLE boat_boat_category (
+                        boat_id uuid NOT NULL REFERENCES boat(id) ON DELETE CASCADE,
+                        boat_category_id uuid NOT NULL REFERENCES boat_category(id) ON DELETE CASCADE,
+                        PRIMARY KEY (boat_id, boat_category_id)
+                    );";
+                await command.ExecuteNonQueryAsync();
+                Console.WriteLine("boat_boat_category table created successfully");
+            }
+        }
+
         await connection.CloseAsync();
     }
 }
@@ -1565,13 +1611,95 @@ admin.MapGet("/category", async (AppDb db) =>
 
 admin.MapGet("/boat-categories", async (AppDb db, string? search) =>
 {
-    var query = db.Categories.Where(c => c.BoatId != null).AsQueryable();
+    var query = db.BoatCategories.AsQueryable();
     if (!string.IsNullOrEmpty(search))
     {
-        query = query.Where(c => c.Name.ToLower().Contains(search.ToLower()));
+        query = query.Where(bc => bc.Name.ToLower().Contains(search.ToLower()));
     }
-    var items = await query.OrderBy(c => c.Name).ToListAsync();
-    return Results.Ok(new { items });
+    var items = await query.OrderBy(bc => bc.SortOrder).ToListAsync();
+    return Results.Ok(new { items = items.Select(bc => new BoatCategoryRow(bc.Id, bc.Name, bc.SortOrder)) });
+});
+
+// Create boat category
+admin.MapPost("/boat-categories", async (BoatCategoryUpsert dto, AppDb db) =>
+{
+    var sortOrder = await db.BoatCategories.CountAsync();
+    var bc = new BoatCategory
+    {
+        Id = Guid.NewGuid(),
+        Name = dto.Name,
+        SortOrder = dto.SortOrder
+    };
+    db.BoatCategories.Add(bc);
+    await db.SaveChangesAsync();
+    return Results.Created($"/admin/boat-categories/{bc.Id}", new BoatCategoryRow(bc.Id, bc.Name, bc.SortOrder));
+});
+
+// Update boat category
+admin.MapPatch("/boat-categories/{id:guid}", async (Guid id, BoatCategoryUpsert dto, AppDb db) =>
+{
+    var bc = await db.BoatCategories.FindAsync(id);
+    if (bc is null) return Results.NotFound();
+    bc.Name = dto.Name;
+    bc.SortOrder = dto.SortOrder;
+    await db.SaveChangesAsync();
+    return Results.Ok(new BoatCategoryRow(bc.Id, bc.Name, bc.SortOrder));
+});
+
+// Delete boat category
+admin.MapDelete("/boat-categories/{id:guid}", async (Guid id, AppDb db) =>
+{
+    var bc = await db.BoatCategories.FindAsync(id);
+    if (bc is null) return Results.NotFound();
+    db.BoatCategories.Remove(bc);
+    await db.SaveChangesAsync();
+    return Results.NoContent();
+});
+
+// Add boat to boat category
+admin.MapPost("/boat-categories/{boatCategoryId:guid}/boats/{boatId:guid}", async (Guid boatCategoryId, Guid boatId, AppDb db) =>
+{
+    var bc = await db.BoatCategories.FindAsync(boatCategoryId);
+    if (bc is null) return Results.NotFound(new { message = "Boat category not found" });
+
+    var boat = await db.Boats.FindAsync(boatId);
+    if (boat is null) return Results.NotFound(new { message = "Boat not found" });
+
+    // Check if relationship already exists
+    var exists = await db.BoatBoatCategories
+        .AnyAsync(bbc => bbc.BoatId == boatId && bbc.BoatCategoryId == boatCategoryId);
+
+    if (exists) return Results.BadRequest(new { message = "Boat is already in this category" });
+
+    db.BoatBoatCategories.Add(new BoatBoatCategory { BoatId = boatId, BoatCategoryId = boatCategoryId });
+    await db.SaveChangesAsync();
+    return Results.Created($"/admin/boat-categories/{boatCategoryId}", new { message = "Boat added to category" });
+});
+
+// Remove boat from boat category
+admin.MapDelete("/boat-categories/{boatCategoryId:guid}/boats/{boatId:guid}", async (Guid boatCategoryId, Guid boatId, AppDb db) =>
+{
+    var bbc = await db.BoatBoatCategories
+        .FirstOrDefaultAsync(x => x.BoatId == boatId && x.BoatCategoryId == boatCategoryId);
+
+    if (bbc is null) return Results.NotFound();
+
+    db.BoatBoatCategories.Remove(bbc);
+    await db.SaveChangesAsync();
+    return Results.NoContent();
+});
+
+// Get boats in a boat category
+admin.MapGet("/boat-categories/{boatCategoryId:guid}/boats", async (Guid boatCategoryId, AppDb db) =>
+{
+    var boats = await db.BoatBoatCategories
+        .Where(bbc => bbc.BoatCategoryId == boatCategoryId)
+        .Include(bbc => bbc.Boat)
+        .Select(bbc => bbc.Boat)
+        .OrderBy(b => b.Name)
+        .ToListAsync();
+
+    return Results.Ok(new { boats });
 });
 
 admin.MapGet("/boat/{boatId:guid}/category", async (Guid boatId, AppDb db) =>

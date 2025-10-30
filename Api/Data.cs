@@ -37,6 +37,8 @@ public class AppDb : DbContext
     public DbSet<Build> Builds => Set<Build>();
     public DbSet<Media> Media => Set<Media>();
     public DbSet<BoatLayerMedia> BoatLayerMedias => Set<BoatLayerMedia>();
+    public DbSet<BoatCategory> BoatCategories => Set<BoatCategory>();
+    public DbSet<BoatBoatCategory> BoatBoatCategories => Set<BoatBoatCategory>();
 
     public DbSet<AppSettings> Settings => Set<AppSettings>();
 
@@ -129,6 +131,20 @@ public class AppDb : DbContext
         b.Entity<BoatLayerMedia>().Property(x => x.MediaId).HasColumnName("media_id");
         b.Entity<BoatLayerMedia>().Property(x => x.SortOrder).HasColumnName("sort_order");
 
+        // BoatCategory entity configuration
+        b.Entity<BoatCategory>().ToTable("boat_category");
+        b.Entity<BoatCategory>().Property(x => x.Id).HasColumnName("id");
+        b.Entity<BoatCategory>().Property(x => x.Name).HasColumnName("name");
+        b.Entity<BoatCategory>().Property(x => x.SortOrder).HasColumnName("sort_order");
+
+        // BoatBoatCategory entity configuration (join table, composite key)
+        b.Entity<BoatBoatCategory>().ToTable("boat_boat_category");
+        b.Entity<BoatBoatCategory>().HasKey(x => new { x.BoatId, x.BoatCategoryId });
+        b.Entity<BoatBoatCategory>().Property(x => x.BoatId).HasColumnName("boat_id");
+        b.Entity<BoatBoatCategory>().Property(x => x.BoatCategoryId).HasColumnName("boat_category_id");
+        b.Entity<BoatBoatCategory>().HasOne(x => x.Boat).WithMany(x => x.BoatBoatCategories).HasForeignKey(x => x.BoatId);
+        b.Entity<BoatBoatCategory>().HasOne(x => x.BoatCategory).WithMany(x => x.BoatBoatCategories).HasForeignKey(x => x.BoatCategoryId);
+
         // Optional indexes/relationships
         b.Entity<Boat>().HasIndex(x => x.Slug).IsUnique();
         b.Entity<Group>().HasOne(x => x.Boat).WithMany(x => x.Groups).HasForeignKey(x => x.BoatId);
@@ -186,6 +202,23 @@ public class Boat
     public string? LogoImageUrl { get; set; }
     public ICollection<Group> Groups { get; set; } = new List<Group>();
     public ICollection<Category> Categories { get; set; } = new List<Category>();
+    public ICollection<BoatBoatCategory> BoatBoatCategories { get; set; } = new List<BoatBoatCategory>();
+}
+
+public class BoatCategory
+{
+    public Guid Id { get; set; }
+    public string Name { get; set; } = "";
+    public int SortOrder { get; set; }
+    public ICollection<BoatBoatCategory> BoatBoatCategories { get; set; } = new List<BoatBoatCategory>();
+}
+
+public class BoatBoatCategory
+{
+    public Guid BoatId { get; set; }
+    public Boat Boat { get; set; } = default!;
+    public Guid BoatCategoryId { get; set; }
+    public BoatCategory BoatCategory { get; set; } = default!;
 }
 
 public class Group

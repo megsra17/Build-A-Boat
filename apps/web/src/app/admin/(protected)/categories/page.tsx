@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, Search, X } from "lucide-react";
-import { CategoriesApi, BoatsApi, type CategoryRow, type Boat } from "@/app/lib/admin-api";
+import { Plus, Search, X, ChevronDown, ChevronRight } from "lucide-react";
+import { BoatCategoriesApi, BoatsApi, type BoatCategoryRow, type Boat } from "@/app/lib/admin-api";
 
 function initialsFromName(name: string) {
   const p = name.trim().split(/\s+/);
@@ -10,20 +10,22 @@ function initialsFromName(name: string) {
 }
 
 export default function CategoriesPage() {
-  const [rows, setRows] = useState<CategoryRow[]>([]);
+  const [rows, setRows] = useState<BoatCategoryRow[]>([]);
   const [boats, setBoats] = useState<Boat[]>([]);
   const [busy, setBusy] = useState(false);
   const [search, setSearch] = useState("");
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState("");
   const [err, setErr] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [categoryBoats, setCategoryBoats] = useState<Record<string, Boat[]>>({});
 
   async function load() {
     setBusy(true);
     setErr(null);
     try {
       const [categoriesRes, boatsRes] = await Promise.all([
-        CategoriesApi.list({ search }),
+        BoatCategoriesApi.list({ search }),
         BoatsApi.list()
       ]);
       setRows(categoriesRes.items ?? []);
@@ -52,12 +54,9 @@ export default function CategoriesPage() {
     if (!newName.trim()) return;
     setErr(null);
     try {
-      // Use the first available boat as default, or a special default ID
-      const defaultBoatId = boats.length > 0 ? boats[0].id : "00000000-0000-0000-0000-000000000000";
-      
-      const created = await CategoriesApi.create({ 
+      const created = await BoatCategoriesApi.create({ 
         Name: newName.trim(),
-        BoatId: defaultBoatId
+        SortOrder: rows.length
       });
       setRows((r) => [created, ...r]);
       setNewName("");
@@ -68,15 +67,54 @@ export default function CategoriesPage() {
   }
 
   async function deleteRow(id: string) {
-    if (!confirm("Delete this category? This action cannot be undone.")) return;
+    if (!confirm("Delete this boat category? This action cannot be undone.")) return;
     const prev = rows;
     setRows((r) => r.filter((x) => x.id !== id)); // optimistic
     try {
-      await CategoriesApi.remove(id);
+      await BoatCategoriesApi.remove(id);
     } catch (e) {
       // rollback
       setRows(prev);
       alert(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  async function expandCategory(id: string) {
+    if (expandedId === id) {
+      setExpandedId(null);
+      return;
+    }
+    
+    setExpandedId(id);
+    
+    // Load boats for this category if not already loaded
+    if (!categoryBoats[id]) {
+      try {
+        const res = await BoatCategoriesApi.getBoats(id);
+        setCategoryBoats(prev => ({ ...prev, [id]: res.boats }));
+      } catch (e) {
+        setErr(e instanceof Error ? e.message : String(e));
+      }
+    }
+  }
+
+  async function addBoatToCategory(boatCategoryId: string, boatId: string) {
+    try {
+      await BoatCategoriesApi.addBoat(boatCategoryId, boatId);
+      const res = await BoatCategoriesApi.getBoats(boatCategoryId);
+      setCategoryBoats(prev => ({ ...prev, [boatCategoryId]: res.boats }));
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  async function removeBoatFromCategory(boatCategoryId: string, boatId: string) {
+    try {
+      await BoatCategoriesApi.removeBoat(boatCategoryId, boatId);
+      const res = await BoatCategoriesApi.getBoats(boatCategoryId);
+      setCategoryBoats(prev => ({ ...prev, [boatCategoryId]: res.boats }));
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
     }
   }
 
@@ -116,11 +154,11 @@ export default function CategoriesPage() {
         <div className="rounded-lg border border-white/10 bg-[#1f1f1f] p-4">
           <div className="space-y-4">
             <div>
-              <label className="block text-sm text-white/70 mb-2">Category Name</label>
+              <label className="block text-sm text-white/70 mb-2">Boat Category Name</label>
               <input
                 autoFocus
                 value={newName}
-                placeholder="Category name…"
+                placeholder="Boat category name…"
                 onChange={(e) => setNewName(e.target.value)}
                 className="w-full bg-[#151515] border border-white/10 rounded px-3 py-2 outline-none focus:ring-2 focus:ring-white/10"
               />
@@ -141,7 +179,7 @@ export default function CategoriesPage() {
                 disabled={!newName.trim()}
                 className="px-4 py-2 rounded bg-amber-500 text-black hover:bg-amber-400 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Save Category
+                Save Boat Category
               </button>
             </div>
           </div>
@@ -164,30 +202,91 @@ export default function CategoriesPage() {
         <ul className="divide-y divide-white/5">
           {rows.map((c) => {
             const name = c.name ?? "(unnamed)";
+            const isExpanded = expandedId === c.id;
+            const boatsInCat = categoryBoats[c.id] ?? [];
+            const unassignedBoats = boats.filter(b => !boatsInCat.some(cb => cb.id === b.id));
+            
             return (
-              <li key={c.id} className="px-4">
-                <div className="flex items-center justify-between py-4">
-                  <div className="flex items-center gap-3">
-                    <span className="inline-flex items-center justify-center size-12 rounded-full bg-orange-500 text-white text-lg font-semibold">
-                      {initialsFromName(name)}
-                    </span>
-                    <div className="text-base">{name}</div>
+              <li key={c.id}>
+                <div className="px-4">
+                  <div className="flex items-center justify-between py-4">
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => expandCategory(c.id)}
+                        className="p-1 hover:bg-white/10 rounded"
+                      >
+                        {isExpanded ? (
+                          <ChevronDown className="size-4 text-white/60" />
+                        ) : (
+                          <ChevronRight className="size-4 text-white/60" />
+                        )}
+                      </button>
+                      <span className="inline-flex items-center justify-center size-12 rounded-full bg-orange-500 text-white text-lg font-semibold">
+                        {initialsFromName(name)}
+                      </span>
+                      <div className="text-base">{name}</div>
+                    </div>
+
+                    <button
+                      title="Delete"
+                      onClick={() => deleteRow(c.id)}
+                      className="size-8 rounded-full border border-white/15 hover:bg-white/10 text-white/80"
+                    >
+                      ×
+                    </button>
                   </div>
 
-                  <button
-                    title="Delete"
-                    onClick={() => deleteRow(c.id)}
-                    className="size-8 rounded-full border border-white/15 hover:bg-white/10 text-white/80"
-                  >
-                    ×
-                  </button>
+                  {/* Expanded boats list */}
+                  {isExpanded && (
+                    <div className="pb-4 pl-12 space-y-3">
+                      {/* Boats in category */}
+                      {boatsInCat.length > 0 && (
+                        <div>
+                          <div className="text-xs text-white/60 mb-2">Boats in this category</div>
+                          <div className="space-y-2">
+                            {boatsInCat.map(boat => (
+                              <div key={boat.id} className="flex items-center justify-between bg-white/5 rounded px-3 py-2">
+                                <span className="text-sm">{boat.name}</span>
+                                <button
+                                  onClick={() => removeBoatFromCategory(c.id, boat.id)}
+                                  className="text-xs px-2 py-1 rounded border border-red-500/30 text-red-400 hover:bg-red-500/10"
+                                >
+                                  Remove
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Available boats to add */}
+                      {unassignedBoats.length > 0 && (
+                        <div>
+                          <div className="text-xs text-white/60 mb-2">Add boats</div>
+                          <div className="space-y-2">
+                            {unassignedBoats.map(boat => (
+                              <div key={boat.id} className="flex items-center justify-between bg-white/5 rounded px-3 py-2">
+                                <span className="text-sm">{boat.name}</span>
+                                <button
+                                  onClick={() => addBoatToCategory(c.id, boat.id)}
+                                  className="text-xs px-2 py-1 rounded border border-green-500/30 text-green-400 hover:bg-green-500/10"
+                                >
+                                  Add
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </li>
             );
           })}
 
           {!busy && rows.length === 0 && (
-            <li className="px-4 py-8 text-center text-white/60">No categories found.</li>
+            <li className="px-4 py-8 text-center text-white/60">No boat categories found.</li>
           )}
           {busy && (
             <li className="px-4 py-8 text-center text-white/60">Loading…</li>
