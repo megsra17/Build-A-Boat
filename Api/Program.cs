@@ -2090,46 +2090,168 @@ admin.MapGet("/option-groups/{groupId:guid}/options", async (Guid groupId, AppDb
 // Create option for a category (auto-creates default OptionGroup if needed)
 admin.MapPost("/category/{categoryId:guid}/options", async (Guid categoryId, OptionCreateForCategoryDto dto, AppDb db) =>
 {
-    var cat = await db.Categories.FindAsync(categoryId);
-    if (cat is null) return Results.NotFound(new { message = "Category not found" });
-
-    // Find or create default OptionGroup for this category
-    var optionGroup = await db.OptionGroups
-        .FirstOrDefaultAsync(og => og.CategoryId == categoryId && og.Name == "Default");
-
-    if (optionGroup is null)
+    try
     {
-        optionGroup = new OptionGroup
+        // Use raw SQL to check if category exists
+        var connection = db.Database.GetDbConnection();
+        await connection.OpenAsync();
+
+        try
         {
-            Id = Guid.NewGuid(),
-            CategoryId = categoryId,
-            Name = "Default",
-            SelectionType = "single",
-            MinSelect = 0,
-            MaxSelect = 0,
-            SortOrder = 0
-        };
-        db.OptionGroups.Add(optionGroup);
-        await db.SaveChangesAsync();
-    }
+            // Verify category exists
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = "SELECT id FROM category WHERE id = @categoryId";
+                var param = cmd.CreateParameter();
+                param.ParameterName = "@categoryId";
+                param.Value = categoryId;
+                cmd.Parameters.Add(param);
 
-    // Create the option
-    var o = new Option
+                var result = await cmd.ExecuteScalarAsync();
+                if (result is null)
+                {
+                    return Results.NotFound(new { message = "Category not found" });
+                }
+            }
+
+            // Find or create default OptionGroup for this category using raw SQL
+            Guid optionGroupId = Guid.Empty;
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = "SELECT id FROM option_group WHERE category_id = @categoryId AND name = 'Default' LIMIT 1";
+                var param = cmd.CreateParameter();
+                param.ParameterName = "@categoryId";
+                param.Value = categoryId;
+                cmd.Parameters.Add(param);
+
+                var ogResult = await cmd.ExecuteScalarAsync();
+                if (ogResult is not null)
+                {
+                    optionGroupId = (Guid)ogResult;
+                }
+                else
+                {
+                    // Create new option group
+                    optionGroupId = Guid.NewGuid();
+                    cmd.CommandText = "INSERT INTO option_group (id, category_id, name, selection_type, min_select, max_select, sort_order) VALUES (@id, @categoryId, @name, @selectionType, @minSelect, @maxSelect, @sortOrder)";
+                    cmd.Parameters.Clear();
+
+                    var idParam = cmd.CreateParameter();
+                    idParam.ParameterName = "@id";
+                    idParam.Value = optionGroupId;
+                    cmd.Parameters.Add(idParam);
+
+                    var catIdParam = cmd.CreateParameter();
+                    catIdParam.ParameterName = "@categoryId";
+                    catIdParam.Value = categoryId;
+                    cmd.Parameters.Add(catIdParam);
+
+                    var nameParam = cmd.CreateParameter();
+                    nameParam.ParameterName = "@name";
+                    nameParam.Value = "Default";
+                    cmd.Parameters.Add(nameParam);
+
+                    var typeParam = cmd.CreateParameter();
+                    typeParam.ParameterName = "@selectionType";
+                    typeParam.Value = "single";
+                    cmd.Parameters.Add(typeParam);
+
+                    var minParam = cmd.CreateParameter();
+                    minParam.ParameterName = "@minSelect";
+                    minParam.Value = 0;
+                    cmd.Parameters.Add(minParam);
+
+                    var maxParam = cmd.CreateParameter();
+                    maxParam.ParameterName = "@maxSelect";
+                    maxParam.Value = 0;
+                    cmd.Parameters.Add(maxParam);
+
+                    var sortParam = cmd.CreateParameter();
+                    sortParam.ParameterName = "@sortOrder";
+                    sortParam.Value = 0;
+                    cmd.Parameters.Add(sortParam);
+
+                    await cmd.ExecuteNonQueryAsync();
+                }
+            }
+
+            // Create the option using raw SQL
+            var optionId = Guid.NewGuid();
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = "INSERT INTO \"option\" (id, option_group_id, sku, label, description, price_delta, image_url, is_default, is_active, sort_order) VALUES (@id, @ogId, @sku, @label, @description, @price, @imageUrl, @isDefault, @isActive, @sortOrder)";
+
+                var idParam = cmd.CreateParameter();
+                idParam.ParameterName = "@id";
+                idParam.Value = optionId;
+                cmd.Parameters.Add(idParam);
+
+                var ogParam = cmd.CreateParameter();
+                ogParam.ParameterName = "@ogId";
+                ogParam.Value = optionGroupId;
+                cmd.Parameters.Add(ogParam);
+
+                var skuParam = cmd.CreateParameter();
+                skuParam.ParameterName = "@sku";
+                skuParam.Value = dto.Sku ?? (object)DBNull.Value;
+                cmd.Parameters.Add(skuParam);
+
+                var labelParam = cmd.CreateParameter();
+                labelParam.ParameterName = "@label";
+                labelParam.Value = dto.Label;
+                cmd.Parameters.Add(labelParam);
+
+                var descParam = cmd.CreateParameter();
+                descParam.ParameterName = "@description";
+                descParam.Value = dto.Description ?? (object)DBNull.Value;
+                cmd.Parameters.Add(descParam);
+
+                var priceParam = cmd.CreateParameter();
+                priceParam.ParameterName = "@price";
+                priceParam.Value = dto.PriceDelta;
+                cmd.Parameters.Add(priceParam);
+
+                var imgParam = cmd.CreateParameter();
+                imgParam.ParameterName = "@imageUrl";
+                imgParam.Value = dto.ImageUrl ?? (object)DBNull.Value;
+                cmd.Parameters.Add(imgParam);
+
+                var defParam = cmd.CreateParameter();
+                defParam.ParameterName = "@isDefault";
+                defParam.Value = dto.IsDefault;
+                cmd.Parameters.Add(defParam);
+
+                var activeParam = cmd.CreateParameter();
+                activeParam.ParameterName = "@isActive";
+                activeParam.Value = dto.IsActive;
+                cmd.Parameters.Add(activeParam);
+
+                var sortParam = cmd.CreateParameter();
+                sortParam.ParameterName = "@sortOrder";
+                sortParam.Value = dto.SortOrder;
+                cmd.Parameters.Add(sortParam);
+
+                await cmd.ExecuteNonQueryAsync();
+            }
+
+            await connection.CloseAsync();
+
+            // Return the created option
+            var optionObj = new { id = optionId, optionGroupId, sku = dto.Sku, label = dto.Label, description = dto.Description, price = dto.PriceDelta, imageUrl = dto.ImageUrl, isDefault = dto.IsDefault, isActive = dto.IsActive, sortOrder = dto.SortOrder };
+            return Results.Created($"/admin/options/{optionId}", optionObj);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error in create option: {ex.Message}");
+            throw;
+        }
+    }
+    catch (Exception ex)
     {
-        id = Guid.NewGuid(),
-        OptionGroupId = optionGroup.Id,
-        Sku = dto.Sku,
-        Label = dto.Label,
-        Description = dto.Description,
-        Price = dto.PriceDelta,
-        ImageUrl = dto.ImageUrl,
-        IsDefault = dto.IsDefault,
-        IsActive = dto.IsActive,
-        SortOrder = dto.SortOrder
-    };
-    db.Options.Add(o);
-    await db.SaveChangesAsync();
-    return Results.Created($"/admin/options/{o.id}", o);
+        Console.WriteLine($"Error creating option: {ex.Message}");
+        Console.WriteLine($"Stack trace: {ex.StackTrace}");
+        return Results.Problem($"Error creating option: {ex.Message}");
+    }
 });
 
 // Create option
