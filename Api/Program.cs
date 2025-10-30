@@ -376,6 +376,8 @@ catch (Exception ex)
     Console.WriteLine($"Stack trace: {ex.StackTrace}");
 }
 
+Console.WriteLine("✓ Configuring application middleware...");
+
 // Global exception handling
 app.UseExceptionHandler(errorApp =>
 {
@@ -2314,4 +2316,6 @@ if (app.Environment.IsDevelopment())
     });
 }
 
+Console.WriteLine("✓ All routes configured");
+Console.WriteLine($"✓ Starting ASP.NET Core application on port: {port}");
 app.Run();
