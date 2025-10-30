@@ -308,6 +308,35 @@ try
             }
         }
 
+        // Remove boat_id column from category table if it exists (migration from old structure)
+        using (var command = connection.CreateCommand())
+        {
+            command.CommandText = @"
+                SELECT EXISTS (
+                    SELECT 1 FROM information_schema.columns 
+                    WHERE table_name = 'category' AND column_name = 'boat_id'
+                )";
+            var result = await command.ExecuteScalarAsync();
+            if (result is true)
+            {
+                Console.WriteLine("Removing boat_id column from category table...");
+                
+                // Drop any foreign key constraint first
+                command.CommandText = @"
+                    ALTER TABLE category 
+                    DROP CONSTRAINT IF EXISTS fk_category_boat_id CASCADE;";
+                await command.ExecuteNonQueryAsync();
+                
+                // Drop the column
+                command.CommandText = @"
+                    ALTER TABLE category 
+                    DROP COLUMN IF EXISTS boat_id;";
+                await command.ExecuteNonQueryAsync();
+                
+                Console.WriteLine("Migration completed: boat_id column removed from category table");
+            }
+        }
+
         await connection.CloseAsync();
     }
 }
