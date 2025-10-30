@@ -337,6 +337,32 @@ try
             }
         }
 
+        // Drop and recreate v_boat_config view to ensure it doesn't reference removed columns
+        using (var command = connection.CreateCommand())
+        {
+            try
+            {
+                Console.WriteLine("Checking if v_boat_config view exists...");
+                command.CommandText = @"
+                    SELECT EXISTS (
+                        SELECT 1 FROM information_schema.views 
+                        WHERE table_name = 'v_boat_config'
+                    )";
+                var result = await command.ExecuteScalarAsync();
+                if (result is true)
+                {
+                    Console.WriteLine("Dropping v_boat_config view...");
+                    command.CommandText = @"DROP VIEW IF EXISTS v_boat_config CASCADE;";
+                    await command.ExecuteNonQueryAsync();
+                    Console.WriteLine("v_boat_config view dropped successfully");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Warning: Failed to drop v_boat_config view: {ex.Message}");
+            }
+        }
+
         await connection.CloseAsync();
     }
 }
@@ -886,10 +912,71 @@ admin.MapPut("/settings/system/timezone", async (SettingDto dto, AppDb db) =>
 //Boat config 
 app.MapGet("/boat/{slug}/config", async (string slug, AppDb db) =>
 {
-    var sql = "SELECT * FROM v_boat_config WHERE slug = @slug";
-    var param = new NpgsqlParameter("slug", slug);
-    var row = await db.BoatConfigs.FromSqlRaw(sql, param).SingleOrDefaultAsync();
-    return row is null ? Results.NotFound() : Results.Ok(row.AsJson());
+    var boat = await db.Boats
+        .AsNoTracking()
+        .FirstOrDefaultAsync(b => b.Slug == slug && b.IsActive);
+
+    if (boat is null) return Results.NotFound();
+
+    // Get all groups with their categories and options for this boat
+    var groups = await db.Groups
+        .Where(g => g.BoatId == boat.Id)
+        .Include(g => g.Categories)
+        .ThenInclude(c => c.OptionsGroups)
+        .ThenInclude(og => og.Options)
+        .ToListAsync();
+
+    // Build the config response
+    var categories = groups
+        .SelectMany(g => g.Categories)
+        .Select(c => new
+        {
+            c.Id,
+            c.Name,
+            c.SortOrder,
+            OptionsGroups = c.OptionsGroups.Select(og => new
+            {
+                og.Id,
+                og.Name,
+                og.SelectionType,
+                og.MinSelect,
+                og.MaxSelect,
+                og.SortOrder,
+                Options = og.Options.Select(o => new
+                {
+                    o.id,
+                    o.Sku,
+                    o.Label,
+                    o.Description,
+                    o.Price,
+                    o.ImageUrl,
+                    o.IsDefault,
+                    o.IsActive,
+                    o.SortOrder
+                }).ToList()
+            }).ToList()
+        })
+        .ToList();
+
+    // Get constraints and pricing rules for this boat
+    var constraints = await db.ConstraintRules
+        .Where(cr => cr.BoatId == boat.Id)
+        .ToListAsync();
+
+    var pricingRules = await db.PricingRules
+        .Where(pr => pr.BoatId == boat.Id)
+        .ToListAsync();
+
+    return Results.Ok(new
+    {
+        BoatId = boat.Id,
+        Slug = boat.Slug,
+        Name = boat.Name,
+        BasePrice = boat.BasePrice,
+        Categories = categories,
+        Constraints = constraints.Select(cr => cr.Expression).ToList(),
+        PricingRules = pricingRules.Select(pr => pr.Expression).ToList()
+    });
 });
 
 //Price + save build
