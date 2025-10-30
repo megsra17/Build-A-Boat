@@ -2356,6 +2356,40 @@ admin.MapPatch("/options/{id:guid}", async (Guid id, OptionUpsert dto, AppDb db)
 
         try
         {
+            // First verify the option exists and get its current option_group_id
+            Guid currentOgId = Guid.Empty;
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = "SELECT option_group_id FROM \"option\" WHERE id = @id";
+                var p = cmd.CreateParameter();
+                p.ParameterName = "@id";
+                p.Value = id;
+                cmd.Parameters.Add(p);
+
+                var result = await cmd.ExecuteScalarAsync();
+                if (result is null)
+                    return Results.NotFound(new { message = "Option not found" });
+                currentOgId = (Guid)result;
+            }
+
+            // Use current option group ID if no new one is provided
+            var ogIdToUse = dto.OptionGroupId == Guid.Empty ? currentOgId : dto.OptionGroupId;
+
+            // Verify the option group exists
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = "SELECT id FROM option_group WHERE id = @ogId";
+                var p = cmd.CreateParameter();
+                p.ParameterName = "@ogId";
+                p.Value = ogIdToUse;
+                cmd.Parameters.Add(p);
+
+                var result = await cmd.ExecuteScalarAsync();
+                if (result is null)
+                    return Results.BadRequest(new { message = "Option group not found" });
+            }
+
+            // Now update the option
             using (var cmd = connection.CreateCommand())
             {
                 cmd.CommandText = @"
@@ -2372,7 +2406,7 @@ admin.MapPatch("/options/{id:guid}", async (Guid id, OptionUpsert dto, AppDb db)
 
                 p = cmd.CreateParameter();
                 p.ParameterName = "@ogId";
-                p.Value = dto.OptionGroupId;
+                p.Value = ogIdToUse;
                 cmd.Parameters.Add(p);
 
                 p = cmd.CreateParameter();
@@ -2415,12 +2449,10 @@ admin.MapPatch("/options/{id:guid}", async (Guid id, OptionUpsert dto, AppDb db)
                 p.Value = dto.SortOrder;
                 cmd.Parameters.Add(p);
 
-                var rowsAffected = await cmd.ExecuteNonQueryAsync();
-                if (rowsAffected == 0)
-                    return Results.NotFound();
+                await cmd.ExecuteNonQueryAsync();
             }
 
-            return Results.Ok(new { id, optionGroupId = dto.OptionGroupId, sku = dto.Sku, label = dto.Label, description = dto.Description, price = dto.PriceDelta, imageUrl = dto.ImageUrl, isDefault = dto.IsDefault, isActive = dto.IsActive, sortOrder = dto.SortOrder });
+            return Results.Ok(new { id, optionGroupId = ogIdToUse, sku = dto.Sku, label = dto.Label, description = dto.Description, price = dto.PriceDelta, imageUrl = dto.ImageUrl, isDefault = dto.IsDefault, isActive = dto.IsActive, sortOrder = dto.SortOrder });
         }
         finally
         {
