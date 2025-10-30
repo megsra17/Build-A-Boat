@@ -260,29 +260,6 @@ try
             }
         }
 
-        // Check if boat_boat_category table exists, if not create it
-        using (var command = connection.CreateCommand())
-        {
-            command.CommandText = @"
-                SELECT EXISTS (
-                    SELECT 1 FROM information_schema.tables 
-                    WHERE table_name = 'boat_boat_category'
-                )";
-            var result = await command.ExecuteScalarAsync();
-            if (result is false)
-            {
-                Console.WriteLine("Creating boat_boat_category table...");
-                command.CommandText = @"
-                    CREATE TABLE boat_boat_category (
-                        boat_id uuid NOT NULL REFERENCES boat(id) ON DELETE CASCADE,
-                        boat_category_id uuid NOT NULL REFERENCES boat_category(id) ON DELETE CASCADE,
-                        PRIMARY KEY (boat_id, boat_category_id)
-                    );";
-                await command.ExecuteNonQueryAsync();
-                Console.WriteLine("boat_boat_category table created successfully");
-            }
-        }
-
         await connection.CloseAsync();
     }
 }
@@ -1565,10 +1542,24 @@ admin.MapGet("/boat/{boatId:guid}/groups", async (Guid boatId, AppDb db) =>
         var groups = await db.Groups
             .Where(g => g.BoatId == boatId)
             .Include(g => g.Categories)
-                .ThenInclude(c => c.OptionsGroups)
-                    .ThenInclude(og => og.Options)
             .OrderBy(g => g.SortOrder)
             .ToListAsync();
+
+        // Load the nested data for each category
+        foreach (var group in groups)
+        {
+            foreach (var category in group.Categories)
+            {
+                var optionGroups = await db.OptionGroups
+                    .Where(og => og.CategoryId == category.Id)
+                    .Include(og => og.Options)
+                    .OrderBy(og => og.SortOrder)
+                    .ToListAsync();
+
+                category.OptionsGroups = optionGroups;
+            }
+        }
+
         return Results.Ok(groups);
     }
     catch (Exception ex)
