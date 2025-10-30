@@ -111,6 +111,7 @@ public class AppDb : DbContext
 
         // Column fixes that don't match by name
         b.Entity<Option>().Property(x => x.Price).HasColumnName("price_delta");
+        b.Entity<Option>().Property(x => x.SortOrder).HasColumnName("sort_order");
 
         // Media entity configuration
         b.Entity<Media>().Property(x => x.Id).HasColumnName("id");
@@ -254,6 +255,7 @@ public class Option
     public string? ImageUrl { get; set; }
     public bool IsDefault { get; set; }
     public bool IsActive { get; set; } = true;
+    public int SortOrder { get; set; }
     public JsonDocument? Metadata { get; set; }
 }
 

@@ -214,6 +214,29 @@ try
             }
         }
 
+        // Check if sort_order column exists in option table, if not add it
+        using (var command = connection.CreateCommand())
+        {
+            command.CommandText = @"
+                SELECT EXISTS (
+                    SELECT 1 FROM information_schema.columns 
+                    WHERE table_name = 'option' AND column_name = 'sort_order'
+                )";
+            var result = await command.ExecuteScalarAsync();
+            if (result is false)
+            {
+                Console.WriteLine("Adding sort_order column to option table...");
+
+                // Add the column with default value
+                command.CommandText = @"
+                    ALTER TABLE ""option"" 
+                    ADD COLUMN sort_order integer NOT NULL DEFAULT 0;";
+                await command.ExecuteNonQueryAsync();
+
+                Console.WriteLine("Migration completed: sort_order column added to option table");
+            }
+        }
+
         await connection.CloseAsync();
     }
 }
@@ -1496,6 +1519,8 @@ admin.MapGet("/boat/{boatId:guid}/groups", async (Guid boatId, AppDb db) =>
         var groups = await db.Groups
             .Where(g => g.BoatId == boatId)
             .Include(g => g.Categories)
+                .ThenInclude(c => c.OptionsGroups)
+                    .ThenInclude(og => og.Options)
             .OrderBy(g => g.SortOrder)
             .ToListAsync();
         return Results.Ok(groups);
@@ -1642,6 +1667,51 @@ admin.MapDelete("/option-groups/{id:guid}", async (Guid id, AppDb db) =>
 admin.MapGet("/option-groups/{groupId:guid}/options", async (Guid groupId, AppDb db) =>
     Results.Ok(await db.Options.Where(o => o.OptionGroupId == groupId).ToListAsync()));
 
+// Create option for a category (auto-creates default OptionGroup if needed)
+admin.MapPost("/category/{categoryId:guid}/options", async (Guid categoryId, OptionCreateForCategoryDto dto, AppDb db) =>
+{
+    var cat = await db.Categories.FindAsync(categoryId);
+    if (cat is null) return Results.NotFound(new { message = "Category not found" });
+
+    // Find or create default OptionGroup for this category
+    var optionGroup = await db.OptionGroups
+        .FirstOrDefaultAsync(og => og.CategoryId == categoryId && og.Name == "Default");
+
+    if (optionGroup is null)
+    {
+        optionGroup = new OptionGroup
+        {
+            Id = Guid.NewGuid(),
+            CategoryId = categoryId,
+            Name = "Default",
+            SelectionType = "single",
+            MinSelect = 0,
+            MaxSelect = 0,
+            SortOrder = 0
+        };
+        db.OptionGroups.Add(optionGroup);
+        await db.SaveChangesAsync();
+    }
+
+    // Create the option
+    var o = new Option
+    {
+        id = Guid.NewGuid(),
+        OptionGroupId = optionGroup.Id,
+        Sku = dto.Sku,
+        Label = dto.Label,
+        Description = dto.Description,
+        Price = dto.PriceDelta,
+        ImageUrl = dto.ImageUrl,
+        IsDefault = dto.IsDefault,
+        IsActive = dto.IsActive,
+        SortOrder = dto.SortOrder
+    };
+    db.Options.Add(o);
+    await db.SaveChangesAsync();
+    return Results.Created($"/admin/options/{o.id}", o);
+});
+
 // Create option
 admin.MapPost("/options", async (OptionUpsert dto, AppDb db) =>
 {
@@ -1655,7 +1725,8 @@ admin.MapPost("/options", async (OptionUpsert dto, AppDb db) =>
         Price = dto.PriceDelta,
         ImageUrl = dto.ImageUrl,
         IsDefault = dto.IsDefault,
-        IsActive = dto.IsActive
+        IsActive = dto.IsActive,
+        SortOrder = dto.SortOrder
     };
     db.Options.Add(o);
     await db.SaveChangesAsync();
@@ -1675,6 +1746,7 @@ admin.MapPatch("/options/{id:guid}", async (Guid id, OptionUpsert dto, AppDb db)
     o.ImageUrl = dto.ImageUrl;
     o.IsDefault = dto.IsDefault;
     o.IsActive = dto.IsActive;
+    o.SortOrder = dto.SortOrder;
     await db.SaveChangesAsync();
     return Results.Ok(o);
 });

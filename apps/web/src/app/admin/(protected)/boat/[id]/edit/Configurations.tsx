@@ -11,7 +11,7 @@ type RenameDialogState = {
   currentName: string;
 };
 
-type Option = { id: string; name: string };
+type Option = { id: string; name: string; optionGroupId?: string };
 type Category = { id: string; name: string; options: Option[]; collapsed?: boolean };
 type Group = { id: string; name: string; collapsed?: boolean; categories: Category[] };
 
@@ -143,6 +143,74 @@ const Api = {
     });
     if (!res.ok) throw new Error(await res.text());
   },
+
+  createOption: async (categoryId: string, label: string, sortOrder: number) => {
+    const jwt = typeof window !== 'undefined' ? (localStorage.getItem("jwt") || sessionStorage.getItem("jwt")) : null;
+    const apiUrl = getApiBase();
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (jwt) {
+      headers["Authorization"] = `Bearer ${jwt}`;
+    }
+    
+    const res = await fetch(`${apiUrl}/admin/category/${categoryId}/options`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        label,
+        sortOrder,
+        sku: null,
+        description: null,
+        priceDelta: 0,
+        imageUrl: null,
+        isDefault: false,
+        isActive: true,
+      }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  },
+
+  updateOption: async (optionId: string, label: string, sortOrder: number, optionGroupId: string) => {
+    const jwt = typeof window !== 'undefined' ? (localStorage.getItem("jwt") || sessionStorage.getItem("jwt")) : null;
+    const apiUrl = getApiBase();
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (jwt) {
+      headers["Authorization"] = `Bearer ${jwt}`;
+    }
+    
+    const res = await fetch(`${apiUrl}/admin/options/${optionId}`, {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({
+        optionGroupId,
+        label,
+        sortOrder,
+        sku: null,
+        description: null,
+        priceDelta: 0,
+        imageUrl: null,
+        isDefault: false,
+        isActive: true,
+      }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  },
+
+  deleteOption: async (optionId: string) => {
+    const jwt = typeof window !== 'undefined' ? (localStorage.getItem("jwt") || sessionStorage.getItem("jwt")) : null;
+    const apiUrl = getApiBase();
+    const headers: Record<string, string> = {};
+    if (jwt) {
+      headers["Authorization"] = `Bearer ${jwt}`;
+    }
+    
+    const res = await fetch(`${apiUrl}/admin/options/${optionId}`, {
+      method: "DELETE",
+      headers,
+    });
+    if (!res.ok) throw new Error(await res.text());
+  },
 };
 
 export default function Configurations({
@@ -172,8 +240,6 @@ export default function Configurations({
   );
 
   // ---------- helpers
-  const uid = () => crypto.randomUUID();
-
   function updateCfg(mut: (c: BoatConfig) => void) {
     setCfg(prev => {
       const next = structuredClone(prev);
@@ -387,9 +453,8 @@ export default function Configurations({
       } else if (renameDialog.type === "category" && renameDialog.groupId) {
         await renameCategory(renameDialog.groupId, renameDialog.id, renameName.trim());
       } else if (renameDialog.type === "option" && renameDialog.groupId && renameDialog.categoryId) {
-        // For options, we just update locally since they're not saved to DB yet
-        renameOption(renameDialog.groupId, renameDialog.categoryId, renameDialog.id, renameName.trim());
-        closeRenameDialog();
+        // For options, we need to update via API
+        await renameOption(renameDialog.groupId, renameDialog.categoryId, renameDialog.id, renameName.trim());
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Failed to rename";
@@ -422,25 +487,71 @@ export default function Configurations({
   }
 
   // ---------- option ops
-  function addOption(groupId: string, catId: string) {
-    updateCfg(c => {
-      const cat = c.groups.find(g=>g.id===groupId)?.categories.find(x=>x.id===catId);
+  async function addOption(groupId: string, catId: string) {
+    setBusy(true);
+    setErr(null);
+    try {
+      const cat = cfg.groups.find(g=>g.id===groupId)?.categories.find(x=>x.id===catId);
       if (!cat) return;
-      cat.options.push({ id: uid(), name: "New Option" });
-    });
+      
+      // Create a default OptionGroup for this category if we need to
+      // For now, we'll use the category ID as the option group ID for storage
+      // The backend will handle the details
+      const newOpt = await Api.createOption(catId, "New Option", cat.options.length);
+      
+      updateCfg(c => {
+        const cat = c.groups.find(g=>g.id===groupId)?.categories.find(x=>x.id===catId);
+        if (!cat) return;
+        cat.options.push({ id: newOpt.id, name: newOpt.label });
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Failed to add option";
+      setErr(msg);
+    } finally {
+      setBusy(false);
+    }
   }
-  function renameOption(groupId: string, catId: string, optId: string, name: string) {
-    updateCfg(c => {
-      const opt = c.groups.find(g=>g.id===groupId)?.categories.find(x=>x.id===catId)?.options.find(o=>o.id===optId);
-      if (opt) opt.name = name;
-    });
-  }
-  function removeOption(groupId: string, catId: string, optId: string) {
-    updateCfg(c => {
-      const cat = c.groups.find(g=>g.id===groupId)?.categories.find(x=>x.id===catId);
+
+  async function renameOption(groupId: string, catId: string, optId: string, name: string) {
+    setBusy(true);
+    setErr(null);
+    try {
+      const cat = cfg.groups.find(g=>g.id===groupId)?.categories.find(x=>x.id===catId);
       if (!cat) return;
-      cat.options = cat.options.filter(o => o.id !== optId);
-    });
+      const optIndex = cat.options.findIndex(o=>o.id===optId);
+      if (optIndex < 0) return;
+      
+      await Api.updateOption(optId, name, optIndex, catId);
+      
+      updateCfg(c => {
+        const opt = c.groups.find(g=>g.id===groupId)?.categories.find(x=>x.id===catId)?.options.find(o=>o.id===optId);
+        if (opt) opt.name = name;
+      });
+      closeRenameDialog();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Failed to rename option";
+      setErr(msg);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function removeOption(groupId: string, catId: string, optId: string) {
+    setBusy(true);
+    setErr(null);
+    try {
+      await Api.deleteOption(optId);
+      updateCfg(c => {
+        const cat = c.groups.find(g=>g.id===groupId)?.categories.find(x=>x.id===catId);
+        if (!cat) return;
+        cat.options = cat.options.filter(o => o.id !== optId);
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Failed to delete option";
+      setErr(msg);
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -574,6 +685,15 @@ export default function Configurations({
                                         if (cat && cat.options) {
                                           const [removed] = cat.options.splice(dragIndex, 1);
                                           cat.options.splice(idx, 0, removed);
+                                          
+                                          // Save new sort orders for all affected options
+                                          setBusy(true);
+                                          Promise.all(cat.options.map((opt, sortIdx) => 
+                                            Api.updateOption(opt.id, opt.name, sortIdx, cat.id)
+                                          )).catch(e => {
+                                            const msg = e instanceof Error ? e.message : "Failed to save option order";
+                                            setErr(msg);
+                                          }).finally(() => setBusy(false));
                                         }
                                       }
                                     });

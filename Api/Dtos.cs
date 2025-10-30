@@ -15,6 +15,7 @@ public record BoatUpsert(
 public record DuplicateBoatDto(string NewSlug, string? NewName, int? NewModelYear);
 public record GroupUpsert(Guid BoatId, string Name, int SortOrder);
 public record CategoryUpsert(Guid GroupId, string Name, int SortOrder, bool IsRequired, Guid? BoatId = null);
+public record OptionCreateForCategoryDto(string? Sku, string Label, string? Description, decimal PriceDelta, string? ImageUrl, bool IsDefault, bool IsActive, int SortOrder);
 public record MediaCreateFromUrl(string Url, string? Label);
 public record MediaCreateDto(string Url, string? Label);
 public record OptionGroupUpsert(Guid CategoryId, string Name, string SelectionType, int MinSelect, int MaxSelect, int SortOrder);

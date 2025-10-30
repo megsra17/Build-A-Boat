@@ -74,11 +74,29 @@ export default function EditBoatPage() {
             groups: (groups && Array.isArray(groups) && groups.length > 0) ? groups.map((g: any) => ({
               id: g.id,
               name: g.name,
-              categories: (g.categories && Array.isArray(g.categories)) ? g.categories.map((c: any) => ({
-                id: c.id,
-                name: c.name,
-                options: []
-              })) : []
+              categories: (g.categories && Array.isArray(g.categories)) ? g.categories.map((c: any) => {
+                // Flatten OptionGroups and Options into a single options array
+                const options: any[] = [];
+                if (c.optionsGroups && Array.isArray(c.optionsGroups)) {
+                  c.optionsGroups.forEach((og: any) => {
+                    if (og.options && Array.isArray(og.options)) {
+                      og.options.forEach((opt: any) => {
+                        options.push({
+                          id: opt.id,
+                          name: opt.label,
+                          optionGroupId: og.id,
+                          ...opt
+                        });
+                      });
+                    }
+                  });
+                }
+                return {
+                  id: c.id,
+                  name: c.name,
+                  options
+                };
+              }) : []
             })) : [
               { id: crypto.randomUUID(), name: "Exterior", categories: [] },
             ],
