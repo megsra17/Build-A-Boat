@@ -320,19 +320,19 @@ try
             if (result is true)
             {
                 Console.WriteLine("Removing boat_id column from category table...");
-                
+
                 // Drop any foreign key constraint first
                 command.CommandText = @"
                     ALTER TABLE category 
                     DROP CONSTRAINT IF EXISTS fk_category_boat_id CASCADE;";
                 await command.ExecuteNonQueryAsync();
-                
+
                 // Drop the column
                 command.CommandText = @"
                     ALTER TABLE category 
                     DROP COLUMN IF EXISTS boat_id;";
                 await command.ExecuteNonQueryAsync();
-                
+
                 Console.WriteLine("Migration completed: boat_id column removed from category table");
             }
         }
@@ -900,12 +900,20 @@ app.MapPost("/builds", async (
     ConstraintEngine validator) =>
 {
     var boat = await db.Boats
-    .Include(boat => boat.Categories).ThenInclude(c => c.OptionsGroups).ThenInclude(g => g.Options)
-    .FirstOrDefaultAsync(b => b.Slug == req.BoatSlug && b.IsActive);
+        .FirstOrDefaultAsync(b => b.Slug == req.BoatSlug && b.IsActive);
 
     if (boat is null) return Results.NotFound(new { message = "Boat not found" });
 
-    var allGroups = boat.Categories.SelectMany(c => c.OptionsGroups).ToList();
+    // Get all groups with their categories and options for this boat
+    var groups = await db.Groups
+        .Where(g => g.BoatId == boat.Id)
+        .Include(g => g.Categories)
+            .ThenInclude(c => c.OptionsGroups)
+                .ThenInclude(og => og.Options)
+        .ToListAsync();
+
+    var allCategories = groups.SelectMany(g => g.Categories).ToList();
+    var allGroups = allCategories.SelectMany(c => c.OptionsGroups).ToList();
     var allOptions = allGroups.SelectMany(g => g.Options).ToDictionary(o => o.id, o => o);
     var selected = (req.SelectedOptions ?? Array.Empty<Guid>()).ToHashSet();
 
@@ -1118,7 +1126,6 @@ admin.MapPost("/boat", async (BoatUpsert dto, AppDb db) =>
 admin.MapGet("/boat/{id:guid}", async (Guid id, AppDb db) =>
 {
     var b = await db.Boats
-        .Include(x => x.Categories)
         .FirstOrDefaultAsync(x => x.Id == id);
 
     if (b is null) return Results.NotFound();

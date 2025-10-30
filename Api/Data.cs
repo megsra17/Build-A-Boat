@@ -195,7 +195,6 @@ public class Boat
     public Guid? BoatCategoryId { get; set; }
     public BoatCategory? BoatCategory { get; set; }
     public ICollection<Group> Groups { get; set; } = new List<Group>();
-    public ICollection<Category> Categories { get; set; } = new List<Category>();
 }
 
 public class BoatCategory
