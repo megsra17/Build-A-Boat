@@ -1710,78 +1710,112 @@ admin.MapGet("/boat/{boatId:guid}/groups", async (Guid boatId, AppDb db) =>
 {
     try
     {
-        // Load groups first
-        var groups = await db.Groups
-            .AsNoTracking()
-            .Where(g => g.BoatId == boatId)
-            .OrderBy(g => g.SortOrder)
-            .ToListAsync();
+        // Use raw SQL to avoid any EF Core issues with the schema
+        var connection = db.Database.GetDbConnection();
+        await connection.OpenAsync();
 
-        // Load all categories for these groups
-        var groupIds = groups.Select(g => g.Id).ToList();
-        var categories = await db.Categories
-            .AsNoTracking()
-            .Where(c => c.GroupId.HasValue && groupIds.Contains(c.GroupId.Value))
-            .OrderBy(c => c.SortOrder)
-            .ToListAsync();
+        var result = new List<GroupDetailDto>();
 
-        // Load all option groups for these categories
-        var categoryIds = categories.Select(c => c.Id).ToList();
-        var optionGroups = await db.OptionGroups
-            .AsNoTracking()
-            .Where(og => categoryIds.Contains(og.CategoryId))
-            .OrderBy(og => og.SortOrder)
-            .ToListAsync();
+        try
+        {
+            // Get groups
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = "SELECT id, boat_id, name, sort_order FROM \"group\" WHERE boat_id = @boatId ORDER BY sort_order";
+                var param = cmd.CreateParameter();
+                param.ParameterName = "@boatId";
+                param.Value = boatId;
+                cmd.Parameters.Add(param);
 
-        // Load all options for these option groups
-        var optionGroupIds = optionGroups.Select(og => og.Id).ToList();
-        var options = await db.Options
-            .AsNoTracking()
-            .Where(o => optionGroupIds.Contains(o.OptionGroupId))
-            .OrderBy(o => o.SortOrder)
-            .ToListAsync();
+                using var reader = await cmd.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                {
+                    var groupId = reader.GetGuid(0);
+                    var name = reader.GetString(2);
+                    var sortOrder = reader.GetInt32(3);
 
-        // Build the result in memory
-        var result = groups.Select(g => new GroupDetailDto(
-            g.Id,
-            g.BoatId,
-            g.Name,
-            g.SortOrder,
-            categories
-                .Where(c => c.GroupId == g.Id)
-                .Select(c => new CategoryDetailDto(
-                    c.Id,
-                    c.GroupId,
-                    c.Name,
-                    c.SortOrder,
-                    c.IsRequired,
-                    optionGroups
-                        .Where(og => og.CategoryId == c.Id)
-                        .Select(og => new OptionGroupDetailDto(
-                            og.Id,
-                            og.CategoryId,
-                            og.Name,
-                            og.SelectionType,
-                            og.MinSelect,
-                            og.MaxSelect,
-                            og.SortOrder,
-                            options
-                                .Where(o => o.OptionGroupId == og.Id)
-                                .Select(o => new OptionDetailDto(
-                                    o.id,
-                                    o.OptionGroupId,
-                                    o.Sku,
-                                    o.Label,
-                                    o.Description,
-                                    o.Price,
-                                    o.ImageUrl,
-                                    o.IsDefault,
-                                    o.IsActive,
-                                    o.SortOrder
-                                )).ToList()
-                        )).ToList()
-                )).ToList()
-        )).ToList();
+                    // Get categories for this group
+                    var categories = new List<CategoryDetailDto>();
+                    using (var catCmd = connection.CreateCommand())
+                    {
+                        catCmd.CommandText = "SELECT id, group_id, name, sort_order, is_required FROM category WHERE group_id = @groupId ORDER BY sort_order";
+                        var catParam = catCmd.CreateParameter();
+                        catParam.ParameterName = "@groupId";
+                        catParam.Value = groupId;
+                        catCmd.Parameters.Add(catParam);
+
+                        using var catReader = await catCmd.ExecuteReaderAsync();
+                        while (await catReader.ReadAsync())
+                        {
+                            var categoryId = catReader.GetGuid(0);
+                            var categoryName = catReader.GetString(2);
+                            var categorySortOrder = catReader.GetInt32(3);
+                            var isRequired = catReader.GetBoolean(4);
+
+                            // Get option groups for this category
+                            var optionGroups = new List<OptionGroupDetailDto>();
+                            using (var ogCmd = connection.CreateCommand())
+                            {
+                                ogCmd.CommandText = "SELECT id, category_id, name, selection_type, min_select, max_select, sort_order FROM option_group WHERE category_id = @categoryId ORDER BY sort_order";
+                                var ogParam = ogCmd.CreateParameter();
+                                ogParam.ParameterName = "@categoryId";
+                                ogParam.Value = categoryId;
+                                ogCmd.Parameters.Add(ogParam);
+
+                                using var ogReader = await ogCmd.ExecuteReaderAsync();
+                                while (await ogReader.ReadAsync())
+                                {
+                                    var ogId = ogReader.GetGuid(0);
+                                    var ogName = ogReader.GetString(2);
+                                    var selectionType = ogReader.GetString(3);
+                                    var minSelect = ogReader.GetInt32(4);
+                                    var maxSelect = ogReader.GetInt32(5);
+                                    var ogSortOrder = ogReader.GetInt32(6);
+
+                                    // Get options for this option group
+                                    var options = new List<OptionDetailDto>();
+                                    using (var optCmd = connection.CreateCommand())
+                                    {
+                                        optCmd.CommandText = "SELECT id, option_group_id, sku, label, description, price_delta, image_url, is_default, is_active, sort_order FROM \"option\" WHERE option_group_id = @ogId ORDER BY sort_order";
+                                        var optParam = optCmd.CreateParameter();
+                                        optParam.ParameterName = "@ogId";
+                                        optParam.Value = ogId;
+                                        optCmd.Parameters.Add(optParam);
+
+                                        using var optReader = await optCmd.ExecuteReaderAsync();
+                                        while (await optReader.ReadAsync())
+                                        {
+                                            options.Add(new OptionDetailDto(
+                                                optReader.GetGuid(0),
+                                                optReader.GetGuid(1),
+                                                optReader.IsDBNull(2) ? null : optReader.GetString(2),
+                                                optReader.GetString(3),
+                                                optReader.IsDBNull(4) ? null : optReader.GetString(4),
+                                                optReader.GetDecimal(5),
+                                                optReader.IsDBNull(6) ? null : optReader.GetString(6),
+                                                optReader.GetBoolean(7),
+                                                optReader.GetBoolean(8),
+                                                optReader.GetInt32(9)
+                                            ));
+                                        }
+                                    }
+
+                                    optionGroups.Add(new OptionGroupDetailDto(ogId, categoryId, ogName, selectionType, minSelect, maxSelect, ogSortOrder, options));
+                                }
+                            }
+
+                            categories.Add(new CategoryDetailDto(categoryId, groupId, categoryName, categorySortOrder, isRequired, optionGroups));
+                        }
+                    }
+
+                    result.Add(new GroupDetailDto(groupId, boatId, name, sortOrder, categories));
+                }
+            }
+        }
+        finally
+        {
+            await connection.CloseAsync();
+        }
 
         return Results.Ok(result);
     }
