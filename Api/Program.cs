@@ -1711,25 +1711,13 @@ admin.MapGet("/boat/{boatId:guid}/groups", async (Guid boatId, AppDb db) =>
     try
     {
         var groups = await db.Groups
+            .AsNoTracking()
             .Where(g => g.BoatId == boatId)
             .Include(g => g.Categories)
+            .ThenInclude(c => c.OptionsGroups)
+            .ThenInclude(og => og.Options)
             .OrderBy(g => g.SortOrder)
             .ToListAsync();
-
-        // Load the nested data for each category
-        foreach (var group in groups)
-        {
-            foreach (var category in group.Categories)
-            {
-                var optionGroups = await db.OptionGroups
-                    .Where(og => og.CategoryId == category.Id)
-                    .Include(og => og.Options)
-                    .OrderBy(og => og.SortOrder)
-                    .ToListAsync();
-
-                category.OptionsGroups = optionGroups;
-            }
-        }
 
         return Results.Ok(groups);
     }
